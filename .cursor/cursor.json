@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "rules": [
+    ".cursor/rules/*.md"
+  ],
+  "context": [
+    ".cursor/context/*"
+  ],
+  "readOnly": [],
+  "exclude": [
+    "node_modules",
+    ".next",
+    "dist"
+  ]
+}
