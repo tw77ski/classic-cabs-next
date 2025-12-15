@@ -89,7 +89,7 @@ export interface CorporateBooking {
   status: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
   notes?: string;
   flightNumber?: string;
-  vehicleType: 'standard' | 'executive' | 'minibus';
+  vehicleType: 'standard' | 'multiseater' | 'luxury';
   createdAt: string;
 }
 

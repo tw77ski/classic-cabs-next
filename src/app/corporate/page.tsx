@@ -10,6 +10,7 @@ import JourneyForm from "../components/JourneyForm";
 import DateTimeInput from "../components/DateTimeInput";
 import PassengerInput from "../components/PassengerInput";
 import FrequentTravelerSelect from "../components/FrequentTravelerSelect";
+import MultiPassengerForm, { PassengerEntry } from "../components/MultiPassengerForm";
 import { saveRecentPassenger } from "@/lib/recentPassengers";
 import { FrequentTraveler, markTravelerUsed } from "@/lib/frequentTravelers";
 
@@ -150,12 +151,20 @@ export default function CorporatePage() {
   // Form state
   const [contactPerson, setContactPerson] = useState("");
   const [poNumber, setPoNumber] = useState("");
+  
+  // Single passenger mode
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [selectedTravelerId, setSelectedTravelerId] = useState<string | undefined>();
   const [selectedTraveler, setSelectedTraveler] = useState<FrequentTraveler | null>(null);
+  
+  // Multi-passenger mode
+  const [isMultiPassenger, setIsMultiPassenger] = useState(false);
+  const [multiPassengers, setMultiPassengers] = useState<PassengerEntry[]>([
+    { id: "initial", firstName: "", lastName: "", phone: "", email: "" }
+  ]);
 
   // Handle frequent traveler selection
   function handleSelectTraveler(traveler: FrequentTraveler) {
@@ -219,6 +228,7 @@ export default function CorporatePage() {
     success?: boolean;
     error?: string;
     bookingId?: string;
+    message?: string;
   } | null>(null);
 
   /* Load session on mount */
@@ -281,14 +291,26 @@ export default function CorporatePage() {
   async function createBooking() {
     if (!session) return;
     
-    if (!firstName || !lastName) {
-      setBookingResult({ error: "Passenger first and last name are required" });
-      return;
+    // Validate based on mode
+    if (isMultiPassenger) {
+      // Multi-passenger validation
+      const validPassengers = multiPassengers.filter(p => p.firstName && p.lastName && p.phone);
+      if (validPassengers.length === 0) {
+        setBookingResult({ error: "At least one passenger with name and phone is required" });
+        return;
+      }
+    } else {
+      // Single passenger validation
+      if (!firstName || !lastName) {
+        setBookingResult({ error: "Passenger first and last name are required" });
+        return;
+      }
+      if (!phone) {
+        setBookingResult({ error: "Passenger phone number is required" });
+        return;
+      }
     }
-    if (!phone) {
-      setBookingResult({ error: "Passenger phone number is required" });
-      return;
-    }
+    
     if (!pickup.address || !dropoff.address) {
       setBookingResult({ error: "Pickup and dropoff addresses are required" });
       return;
@@ -311,52 +333,174 @@ export default function CorporatePage() {
         .filter(s => s.address && s.lat && s.lng)
         .map(s => s.address);
 
-      const res = await fetch(BOOK_API, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          companyName: session.company.name,
-          contactPerson,
-          poNumber,
+      if (isMultiPassenger) {
+        // Multi-passenger booking
+        const validPassengers = multiPassengers.filter(p => p.firstName && p.lastName && p.phone);
+        
+        // Group passengers by pickup location
+        const sharedPickupPassengers = validPassengers.filter(p => !p.customPickup?.address);
+        const customPickupPassengers = validPassengers.filter(p => p.customPickup?.address);
+        
+        const bookingResults: { success: boolean; bookingId?: string; passenger: string; error?: string }[] = [];
+        
+        // Book shared pickup passengers together (one booking with multiple passengers in notes)
+        if (sharedPickupPassengers.length > 0) {
+          const passengerNames = sharedPickupPassengers.map(p => `${p.firstName} ${p.lastName}`).join(", ");
+          const passengerPhones = sharedPickupPassengers.map(p => p.phone).join(", ");
+          const multiNotes = `GROUP BOOKING (${sharedPickupPassengers.length} passengers): ${passengerNames}\nPhones: ${passengerPhones}${notes ? `\n${notes}` : ""}`;
+          
+          const res = await fetch(BOOK_API, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              companyName: session.company.name,
+              contactPerson,
+              poNumber,
+              firstName: sharedPickupPassengers[0].firstName,
+              lastName: sharedPickupPassengers[0].lastName,
+              phone: sharedPickupPassengers[0].phone,
+              email: sharedPickupPassengers[0].email,
+              pickupAddress: pickup.address,
+              pickupLat: pickup.lat,
+              pickupLng: pickup.lng,
+              dropoffAddress: dropoff.address,
+              dropoffLat: dropoff.lat,
+              dropoffLng: dropoff.lng,
+              stops: stopsData,
+              time: asap ? null : pickupDateTime || null,
+              notes: multiNotes,
+              accountId: session.company.taxiCallerAccountId,
+              costCentre: selectedCostCentre || undefined,
+              passengerCount: sharedPickupPassengers.length,
+            }),
+          });
+          
+          const json = await res.json();
+          bookingResults.push({
+            success: json.success,
+            bookingId: json.booking_id || json.job_id,
+            passenger: passengerNames,
+            error: json.error,
+          });
+          
+          // Save passengers for autofill
+          sharedPickupPassengers.forEach(p => {
+            saveRecentPassenger({ firstName: p.firstName, lastName: p.lastName, phone: p.phone, email: p.email });
+            if (p.travelerId) markTravelerUsed(p.travelerId);
+          });
+        }
+        
+        // Book custom pickup passengers separately
+        for (const passenger of customPickupPassengers) {
+          const customNotes = `Different pickup location${notes ? `\n${notes}` : ""}`;
+          
+          const res = await fetch(BOOK_API, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              companyName: session.company.name,
+              contactPerson,
+              poNumber,
+              firstName: passenger.firstName,
+              lastName: passenger.lastName,
+              phone: passenger.phone,
+              email: passenger.email,
+              pickupAddress: passenger.customPickup?.address || pickup.address,
+              pickupLat: passenger.customPickup?.lat || pickup.lat,
+              pickupLng: passenger.customPickup?.lng || pickup.lng,
+              dropoffAddress: dropoff.address,
+              dropoffLat: dropoff.lat,
+              dropoffLng: dropoff.lng,
+              stops: stopsData,
+              time: asap ? null : pickupDateTime || null,
+              notes: customNotes,
+              accountId: session.company.taxiCallerAccountId,
+              costCentre: selectedCostCentre || undefined,
+            }),
+          });
+          
+          const json = await res.json();
+          bookingResults.push({
+            success: json.success,
+            bookingId: json.booking_id || json.job_id,
+            passenger: `${passenger.firstName} ${passenger.lastName}`,
+            error: json.error,
+          });
+          
+          saveRecentPassenger({ firstName: passenger.firstName, lastName: passenger.lastName, phone: passenger.phone, email: passenger.email });
+          if (passenger.travelerId) markTravelerUsed(passenger.travelerId);
+        }
+        
+        // Summarize results
+        const successCount = bookingResults.filter(r => r.success).length;
+        const failCount = bookingResults.filter(r => !r.success).length;
+        
+        if (failCount === 0) {
+          const bookingIds = bookingResults.map(r => r.bookingId).join(", ");
+          setBookingResult({ 
+            success: true, 
+            bookingId: bookingIds,
+            message: `${successCount} booking(s) created successfully`
+          });
+        } else if (successCount > 0) {
+          setBookingResult({ 
+            success: true, 
+            bookingId: bookingResults.filter(r => r.success).map(r => r.bookingId).join(", "),
+            error: `${successCount} succeeded, ${failCount} failed`
+          });
+        } else {
+          setBookingResult({ error: bookingResults[0]?.error || "All bookings failed" });
+        }
+        
+      } else {
+        // Single passenger booking (original logic)
+        const res = await fetch(BOOK_API, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            companyName: session.company.name,
+            contactPerson,
+            poNumber,
+            firstName,
+            lastName,
+            phone,
+            email,
+            pickupAddress: pickup.address,
+            pickupLat: pickup.lat,
+            pickupLng: pickup.lng,
+            dropoffAddress: dropoff.address,
+            dropoffLat: dropoff.lat,
+            dropoffLng: dropoff.lng,
+            stops: stopsData,
+            time: asap ? null : pickupDateTime || null,
+            notes,
+            accountId: session.company.taxiCallerAccountId,
+            costCentre: selectedCostCentre || undefined,
+          }),
+        });
+
+        const json = await res.json();
+
+        if (!json.success) {
+          setBookingResult({ error: json.error || "Booking failed" });
+          return;
+        }
+
+        setBookingResult({ success: true, bookingId: json.booking_id || json.job_id });
+        
+        // Update frequent traveler stats if one was selected
+        if (selectedTravelerId) {
+          markTravelerUsed(selectedTravelerId);
+        }
+        
+        // Save passenger for future autofill
+        saveRecentPassenger({
           firstName,
           lastName,
           phone,
           email,
-          pickupAddress: pickup.address,
-          pickupLat: pickup.lat,
-          pickupLng: pickup.lng,
-          dropoffAddress: dropoff.address,
-          dropoffLat: dropoff.lat,
-          dropoffLng: dropoff.lng,
-          stops: stopsData,
-          time: asap ? null : pickupDateTime || null,
-          notes,
-          accountId: session.company.taxiCallerAccountId,
-          costCentre: selectedCostCentre || undefined,
-        }),
-      });
-
-      const json = await res.json();
-
-      if (!json.success) {
-        setBookingResult({ error: json.error || "Booking failed" });
-        return;
+        });
       }
-
-      setBookingResult({ success: true, bookingId: json.booking_id || json.job_id });
-      
-      // Update frequent traveler stats if one was selected
-      if (selectedTravelerId) {
-        markTravelerUsed(selectedTravelerId);
-      }
-      
-      // Save passenger for future autofill
-      saveRecentPassenger({
-        firstName,
-        lastName,
-        phone,
-        email,
-      });
       
       // Refresh history
       loadHistory(session.company.taxiCallerAccountId);
@@ -369,6 +513,7 @@ export default function CorporatePage() {
       setEmail("");
       setSelectedTravelerId(undefined);
       setSelectedTraveler(null);
+      setMultiPassengers([{ id: "initial", firstName: "", lastName: "", phone: "", email: "" }]);
       setPickup({ address: "", lat: null, lng: null });
       setDropoff({ address: "", lat: null, lng: null });
       setStops([]);
@@ -488,93 +633,128 @@ export default function CorporatePage() {
             </div>
           )}
 
-          {/* Frequent Travelers & Passenger Details */}
+          {/* Passenger Section */}
           <div className="pt-3 border-t border-[#333]">
-            <p className="text-[10px] uppercase tracking-widest text-[#666] mb-3">Passenger</p>
-            
-            {/* Frequent Traveler Select */}
-            <FrequentTravelerSelect
-              onSelect={handleSelectTraveler}
-              selectedId={selectedTravelerId}
-            />
-
-            {/* Quick Address Buttons - show when traveler has saved addresses */}
-            {selectedTraveler && (selectedTraveler.homeAddress?.address || selectedTraveler.workAddress?.address) && (
-              <div className="mt-3 p-3 bg-[#ffd55c]/5 border border-[#ffd55c]/20 rounded-lg">
-                <p className="text-[10px] text-[#888] mb-2 flex items-center gap-1">
-                  <svg className="w-3 h-3 text-[#ffd55c]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                    <circle cx="12" cy="10" r="3" />
-                  </svg>
-                  {firstName}&apos;s Saved Addresses
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {selectedTraveler.homeAddress?.address && (
-                    <div className="flex gap-1">
-                      <button
-                        type="button"
-                        onClick={() => useTravelerAddress("home", "pickup")}
-                        className="px-2 py-1 text-xs bg-[#111] border border-[#333] rounded hover:border-[#ffd55c]/50 text-[#ccc] transition flex items-center gap-1"
-                        title={selectedTraveler.homeAddress.address}
-                      >
-                        <svg className="w-3 h-3 text-[#888]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                        </svg>
-                        Home → Pickup
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => useTravelerAddress("home", "dropoff")}
-                        className="px-2 py-1 text-xs bg-[#111] border border-[#333] rounded hover:border-[#ffd55c]/50 text-[#ccc] transition flex items-center gap-1"
-                        title={selectedTraveler.homeAddress.address}
-                      >
-                        Home → Drop-off
-                      </button>
-                    </div>
-                  )}
-                  {selectedTraveler.workAddress?.address && (
-                    <div className="flex gap-1">
-                      <button
-                        type="button"
-                        onClick={() => useTravelerAddress("work", "pickup")}
-                        className="px-2 py-1 text-xs bg-[#111] border border-[#333] rounded hover:border-[#ffd55c]/50 text-[#ccc] transition flex items-center gap-1"
-                        title={selectedTraveler.workAddress.address}
-                      >
-                        <svg className="w-3 h-3 text-[#888]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <rect x="2" y="7" width="20" height="14" rx="2" />
-                        </svg>
-                        Work → Pickup
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => useTravelerAddress("work", "dropoff")}
-                        className="px-2 py-1 text-xs bg-[#111] border border-[#333] rounded hover:border-[#ffd55c]/50 text-[#ccc] transition flex items-center gap-1"
-                        title={selectedTraveler.workAddress.address}
-                      >
-                        Work → Drop-off
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-            
-            {/* Manual Entry / Selected Traveler Details */}
-            <div className="mt-3 pt-3 border-t border-[#222]">
-              <p className="text-[10px] text-[#666] mb-2">
-                {selectedTravelerId ? "Selected traveler details:" : "Or enter passenger details manually:"}
+            {/* Single/Multi Toggle */}
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[10px] uppercase tracking-widest text-[#666]">
+                {isMultiPassenger ? "Passengers" : "Passenger"}
               </p>
-              <PassengerInput
-                firstName={firstName}
-                lastName={lastName}
-                phone={phone}
-                email={email}
+              <button
+                type="button"
+                onClick={() => setIsMultiPassenger(!isMultiPassenger)}
+                className={`flex items-center gap-1.5 px-2 py-1 text-[10px] rounded transition ${
+                  isMultiPassenger
+                    ? "bg-[#ffd55c]/10 border border-[#ffd55c]/30 text-[#ffd55c]"
+                    : "border border-[#333] text-[#888] hover:border-[#555]"
+                }`}
+              >
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+                {isMultiPassenger ? "Multiple Passengers" : "Add Multiple"}
+              </button>
+            </div>
+
+            {isMultiPassenger ? (
+              /* Multi-Passenger Mode */
+              <MultiPassengerForm
+                passengers={multiPassengers}
+                onPassengersChange={setMultiPassengers}
+                allowCustomPickups={true}
+                maxPassengers={10}
+              />
+            ) : (
+              /* Single Passenger Mode */
+              <>
+                {/* Frequent Traveler Select */}
+                <FrequentTravelerSelect
+                  onSelect={handleSelectTraveler}
+                  selectedId={selectedTravelerId}
+                />
+
+                {/* Quick Address Buttons - show when traveler has saved addresses */}
+                {selectedTraveler && (selectedTraveler.homeAddress?.address || selectedTraveler.workAddress?.address) && (
+                  <div className="mt-3 p-3 bg-[#ffd55c]/5 border border-[#ffd55c]/20 rounded-lg">
+                    <p className="text-[10px] text-[#888] mb-2 flex items-center gap-1">
+                      <svg className="w-3 h-3 text-[#ffd55c]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                        <circle cx="12" cy="10" r="3" />
+                      </svg>
+                      {firstName}&apos;s Saved Addresses
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedTraveler.homeAddress?.address && (
+                        <div className="flex gap-1">
+                          <button
+                            type="button"
+                            onClick={() => useTravelerAddress("home", "pickup")}
+                            className="px-2 py-1 text-xs bg-[#111] border border-[#333] rounded hover:border-[#ffd55c]/50 text-[#ccc] transition flex items-center gap-1"
+                            title={selectedTraveler.homeAddress.address}
+                          >
+                            <svg className="w-3 h-3 text-[#888]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                            </svg>
+                            Home → Pickup
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => useTravelerAddress("home", "dropoff")}
+                            className="px-2 py-1 text-xs bg-[#111] border border-[#333] rounded hover:border-[#ffd55c]/50 text-[#ccc] transition flex items-center gap-1"
+                            title={selectedTraveler.homeAddress.address}
+                          >
+                            Home → Drop-off
+                          </button>
+                        </div>
+                      )}
+                      {selectedTraveler.workAddress?.address && (
+                        <div className="flex gap-1">
+                          <button
+                            type="button"
+                            onClick={() => useTravelerAddress("work", "pickup")}
+                            className="px-2 py-1 text-xs bg-[#111] border border-[#333] rounded hover:border-[#ffd55c]/50 text-[#ccc] transition flex items-center gap-1"
+                            title={selectedTraveler.workAddress.address}
+                          >
+                            <svg className="w-3 h-3 text-[#888]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <rect x="2" y="7" width="20" height="14" rx="2" />
+                            </svg>
+                            Work → Pickup
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => useTravelerAddress("work", "dropoff")}
+                            className="px-2 py-1 text-xs bg-[#111] border border-[#333] rounded hover:border-[#ffd55c]/50 text-[#ccc] transition flex items-center gap-1"
+                            title={selectedTraveler.workAddress.address}
+                          >
+                            Work → Drop-off
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Manual Entry / Selected Traveler Details */}
+                <div className="mt-3 pt-3 border-t border-[#222]">
+                  <p className="text-[10px] text-[#666] mb-2">
+                    {selectedTravelerId ? "Selected traveler details:" : "Or enter passenger details manually:"}
+                  </p>
+                  <PassengerInput
+                    firstName={firstName}
+                    lastName={lastName}
+                    phone={phone}
+                    email={email}
                 onFirstNameChange={(v) => { setFirstName(v); setSelectedTravelerId(undefined); setSelectedTraveler(null); }}
                 onLastNameChange={(v) => { setLastName(v); setSelectedTravelerId(undefined); setSelectedTraveler(null); }}
                 onPhoneChange={(v) => { setPhone(v); setSelectedTravelerId(undefined); setSelectedTraveler(null); }}
                 onEmailChange={(v) => { setEmail(v); setSelectedTravelerId(undefined); setSelectedTraveler(null); }}
               />
             </div>
+              </>
+            )}
           </div>
 
           {/* Journey Details */}
@@ -649,15 +829,88 @@ export default function CorporatePage() {
           {/* Result Message */}
           {bookingResult && (
             <div
-              className={`p-3 rounded-lg text-sm ${
+              className={`p-4 rounded-xl text-sm relative overflow-hidden ${
                 bookingResult.success
-                  ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-400"
+                  ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 booking-success-enter"
                   : "bg-red-500/10 border border-red-500/30 text-red-400"
               }`}
             >
-              {bookingResult.success
-                ? `✓ Booking created! ID: ${bookingResult.bookingId}`
-                : `✗ ${bookingResult.error}`}
+              {bookingResult.success ? (
+                <div>
+                  {/* Confetti animation */}
+                  <div className="confetti-container">
+                    <div className="confetti" />
+                    <div className="confetti" />
+                    <div className="confetti" />
+                    <div className="confetti" />
+                    <div className="confetti" />
+                    <div className="confetti" />
+                    <div className="confetti" />
+                    <div className="confetti" />
+                  </div>
+
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center checkmark-circle flex-shrink-0">
+                      <svg className="w-6 h-6 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <polyline className="checkmark-check" points="20 6 9 17 4 12" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-emerald-300">{bookingResult.message || "Booking Created!"}</p>
+                      <p className="text-xs text-emerald-400/70">Successfully added to account</p>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-[#111] rounded-lg p-3 flex items-center justify-between group">
+                    <div>
+                      <p className="text-[10px] text-[#666] uppercase tracking-wider mb-1">Booking ID</p>
+                      <p className="font-mono text-lg text-[#ffd55c] font-bold">{bookingResult.bookingId}</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(bookingResult.bookingId || "");
+                        const btn = document.getElementById("copy-btn-corporate");
+                        if (btn) {
+                          btn.classList.add("copied");
+                          setTimeout(() => btn.classList.remove("copied"), 2000);
+                        }
+                      }}
+                      id="copy-btn-corporate"
+                      className="relative p-2 rounded-lg bg-[#1b1b1b] hover:bg-[#222] border border-[#333] hover:border-[#ffd55c]/50 transition group/btn"
+                      title="Copy booking ID"
+                    >
+                      <svg className="w-5 h-5 text-[#888] group-hover/btn:text-[#ffd55c] transition [.copied_&]:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                      </svg>
+                      <svg className="w-5 h-5 text-emerald-400 hidden [.copied_&]:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                      <span className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-emerald-500 text-white text-xs rounded opacity-0 [.copied_&]:opacity-100 transition whitespace-nowrap">
+                        Copied!
+                      </span>
+                    </button>
+                  </div>
+                  
+                  {bookingResult.error && (
+                    <p className="text-xs mt-3 text-amber-400 flex items-center gap-1">
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M12 8v4M12 16h.01" />
+                      </svg>
+                      Note: {bookingResult.error}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <svg className="w-5 h-5 text-red-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M15 9l-6 6M9 9l6 6" />
+                  </svg>
+                  <span>{bookingResult.error}</span>
+                </div>
+              )}
             </div>
           )}
 

@@ -330,10 +330,83 @@ export default function CorporateHistoryPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-[#ffd55c]/30 border-t-[#ffd55c] rounded-full animate-spin" />
-          <p className="text-sm text-[#888]">Loading history...</p>
+      <div className="space-y-6">
+        {/* Header Skeleton */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="skeleton h-6 w-40 rounded mb-2" />
+            <div className="skeleton h-4 w-48 rounded" />
+          </div>
+          <div className="flex gap-2">
+            <div className="skeleton h-10 w-16 rounded-lg" />
+            <div className="skeleton h-10 w-16 rounded-lg" />
+          </div>
+        </div>
+
+        {/* Filters Skeleton */}
+        <div className="bg-[#1b1b1b] p-4 rounded-lg border border-[#333]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="lg:col-span-2">
+              <div className="skeleton h-3 w-16 rounded mb-2" />
+              <div className="skeleton h-10 w-full rounded-lg" />
+            </div>
+            <div>
+              <div className="skeleton h-3 w-12 rounded mb-2" />
+              <div className="skeleton h-10 w-full rounded-lg" />
+            </div>
+            <div>
+              <div className="skeleton h-3 w-8 rounded mb-2" />
+              <div className="skeleton h-10 w-full rounded-lg" />
+            </div>
+            <div>
+              <div className="skeleton h-3 w-14 rounded mb-2" />
+              <div className="skeleton h-10 w-full rounded-lg" />
+            </div>
+          </div>
+        </div>
+
+        {/* Table Skeleton */}
+        <div className="bg-[#1b1b1b] rounded-lg border border-[#333] overflow-hidden">
+          {/* Table Header */}
+          <div className="flex items-center gap-4 px-4 py-3 border-b border-[#333]">
+            <div className="skeleton h-3 w-16 rounded" style={{ flex: 1 }} />
+            <div className="skeleton h-3 w-20 rounded" style={{ flex: 1 }} />
+            <div className="skeleton h-3 w-14 rounded" style={{ flex: 2 }} />
+            <div className="skeleton h-3 w-16 rounded" style={{ flex: 2 }} />
+            <div className="skeleton h-3 w-12 rounded" style={{ flex: 1 }} />
+            <div className="skeleton h-3 w-14 rounded" style={{ flex: 1 }} />
+          </div>
+
+          {/* Table Rows */}
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div
+              key={i}
+              className={`flex items-center gap-4 px-4 py-3 ${
+                i % 2 === 0 ? "bg-[#1b1b1b]" : "bg-[#181818]"
+              }`}
+              style={{ animationDelay: `${i * 50}ms` }}
+            >
+              <div style={{ flex: 1 }}>
+                <div className="skeleton h-4 w-20 rounded mb-1" />
+                <div className="skeleton h-3 w-12 rounded" />
+              </div>
+              <div className="skeleton h-5 w-16 rounded" style={{ flex: 1 }} />
+              <div className="skeleton h-4 w-full rounded" style={{ flex: 2 }} />
+              <div className="skeleton h-4 w-full rounded" style={{ flex: 2 }} />
+              <div className="skeleton h-4 w-14 rounded ml-auto" style={{ flex: 1 }} />
+              <div className="skeleton h-5 w-16 rounded" style={{ flex: 1 }} />
+            </div>
+          ))}
+
+          {/* Pagination Skeleton */}
+          <div className="flex items-center justify-between px-4 py-3 border-t border-[#333]">
+            <div className="skeleton h-3 w-32 rounded" />
+            <div className="flex gap-1">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="skeleton h-8 w-8 rounded" />
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     );

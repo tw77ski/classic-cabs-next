@@ -57,8 +57,84 @@ export default function CorporateDashboardPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-2 border-[#ffd55c]/30 border-t-[#ffd55c] rounded-full animate-spin" />
+      <div className="space-y-6">
+        {/* Welcome Banner Skeleton */}
+        <div className="bg-gradient-to-r from-[#ffd55c]/10 to-transparent p-6 border border-[#ffd55c]/20 rounded-xl">
+          <div className="skeleton h-6 w-40 rounded mb-2" />
+          <div className="skeleton h-4 w-72 rounded" />
+        </div>
+
+        {/* Quick Actions Skeleton */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="bg-[#1b1b1b] p-4 border border-[#333] rounded-xl"
+              style={{ animationDelay: `${i * 50}ms` }}
+            >
+              <div className="skeleton w-10 h-10 rounded-lg mb-3" />
+              <div className="skeleton h-4 w-20 rounded mb-1" />
+              <div className="skeleton h-3 w-16 rounded" />
+            </div>
+          ))}
+        </div>
+
+        {/* Stats Skeleton */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="bg-[#1b1b1b] p-5 border border-[#333] rounded-xl"
+              style={{ animationDelay: `${i * 75}ms` }}
+            >
+              <div className="skeleton h-3 w-24 rounded mb-2" />
+              <div className="skeleton h-8 w-16 rounded mb-2" />
+              <div className="skeleton h-3 w-28 rounded" />
+            </div>
+          ))}
+        </div>
+
+        {/* Two Column Grid Skeleton */}
+        <div className="grid lg:grid-cols-2 gap-6">
+          {/* Upcoming Bookings Skeleton */}
+          <div className="bg-[#1b1b1b] p-5 border border-[#333] rounded-xl">
+            <div className="flex items-center justify-between mb-4">
+              <div className="skeleton h-4 w-36 rounded" />
+              <div className="skeleton h-3 w-16 rounded" />
+            </div>
+            <div className="space-y-3">
+              {Array.from({ length: 2 }).map((_, i) => (
+                <div key={i} className="p-3 bg-[#111] rounded-lg border border-[#222]">
+                  <div className="flex justify-between mb-2">
+                    <div className="skeleton h-4 w-24 rounded" />
+                    <div className="skeleton h-5 w-20 rounded" />
+                  </div>
+                  <div className="skeleton h-3 w-full rounded" />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Recent Activity Skeleton */}
+          <div className="bg-[#1b1b1b] p-5 border border-[#333] rounded-xl">
+            <div className="flex items-center justify-between mb-4">
+              <div className="skeleton h-4 w-32 rounded" />
+              <div className="skeleton h-3 w-16 rounded" />
+            </div>
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="p-3 bg-[#111] rounded-lg border border-[#222]">
+                  <div className="flex justify-between mb-2">
+                    <div className="skeleton h-4 w-20 rounded" />
+                    <div className="skeleton h-5 w-16 rounded" />
+                  </div>
+                  <div className="skeleton h-3 w-3/4 rounded mb-1" />
+                  <div className="skeleton h-2 w-16 rounded" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

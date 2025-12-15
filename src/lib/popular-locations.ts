@@ -13,12 +13,12 @@ export const POPULAR_LOCATIONS: POILocation[] = [
   },
   {
     label: "Radisson Blu Waterfront Jersey",
-    lat: 49.1858,
-    lng: -2.1130,
+    lat: 49.18406747471422,
+    lng: -2.1169421152642984,
   },
   {
     label: "Merton Hotel",
-    lat: 49.1897,
-    lng: -2.0952,
+    lat: 49.18005145026025,
+    lng: -2.0939220017711953,
   },
 ];

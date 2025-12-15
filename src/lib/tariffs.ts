@@ -1,7 +1,7 @@
 // Jersey Taxi Tariff System
 // Based on official Jersey taxi fare regulations
 
-export type VehicleType = "standard" | "luxury";
+export type VehicleType = "standard" | "multiseater" | "luxury";
 
 export interface TariffRate {
   initial: number;    // Initial charge in £
@@ -76,7 +76,10 @@ const CARD_FEE = 0.50;
 const EXTRA_PASSENGER_FEE = 2.50;
 
 // Luxury V-Class hourly rate
-export const LUXURY_HOURLY_RATE = 80;
+export const LUXURY_HOURLY_RATE = 70;
+
+// Multi-seater surcharge (fixed amount added to fare)
+export const MULTISEATER_SURCHARGE = 5.00;
 
 /**
  * Get the active tariff for a given date/time
@@ -93,12 +96,14 @@ export interface FareResult {
   tariff: Tariff | null;
   vehicleType: VehicleType;
   isLuxury: boolean;
+  isMultiseater: boolean;
   breakdown: {
     base: number;
     units: number;
     unitsCost: number;
     passengerSurcharge: number;
     cardFee: number;
+    multiseaterSurcharge?: number;
     // Luxury specific
     hours?: number;
     hourlyRate?: number;
@@ -132,6 +137,7 @@ export function calculateFare(
       tariff: null,
       vehicleType: "luxury",
       isLuxury: true,
+      isMultiseater: false,
       breakdown: {
         base: 0,
         units: 0,
@@ -143,6 +149,9 @@ export function calculateFare(
       },
     };
   }
+
+  // Check if multiseater
+  const isMultiseater = vehicleType === "multiseater";
 
   // Standard taxi: Use tariff-based calculation
   const tariff = getActiveTariff(date);
@@ -172,8 +181,11 @@ export function calculateFare(
   // Card fee
   const cardFee = CARD_FEE;
 
+  // Multiseater surcharge
+  const multiseaterSurcharge = isMultiseater ? MULTISEATER_SURCHARGE : 0;
+
   // Total fare
-  const totalFare = base + unitsCost + passengerSurcharge + cardFee;
+  const totalFare = base + unitsCost + passengerSurcharge + cardFee + multiseaterSurcharge;
 
   // Round to nearest penny (0.01)
   const fare = Math.round(totalFare * 100) / 100;
@@ -181,14 +193,16 @@ export function calculateFare(
   return {
     fare,
     tariff,
-    vehicleType: "standard",
+    vehicleType,
     isLuxury: false,
+    isMultiseater,
     breakdown: {
       base,
       units: Math.round(units * 10) / 10, // Round units for display
       unitsCost: Math.round(unitsCost * 100) / 100,
       passengerSurcharge,
       cardFee,
+      multiseaterSurcharge: isMultiseater ? multiseaterSurcharge : undefined,
     },
   };
 }

@@ -175,6 +175,131 @@
    MICRO-ANIMATIONS
    ============================================ */
 @layer utilities {
+  /* ===== SUCCESS ANIMATION ===== */
+  .booking-success-enter {
+    animation: booking-success 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+
+  @keyframes booking-success {
+    0% {
+      opacity: 0;
+      transform: scale(0.8) translateY(20px);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.02) translateY(-5px);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  /* Success checkmark animation */
+  .checkmark-circle {
+    animation: checkmark-circle 0.4s ease-out forwards;
+  }
+
+  .checkmark-check {
+    animation: checkmark-check 0.3s ease-out 0.2s forwards;
+    stroke-dasharray: 50;
+    stroke-dashoffset: 50;
+  }
+
+  @keyframes checkmark-circle {
+    0% {
+      transform: scale(0);
+      opacity: 0;
+    }
+    50% {
+      transform: scale(1.1);
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  @keyframes checkmark-check {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  /* Confetti burst */
+  .confetti-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 10px;
+    height: 10px;
+    pointer-events: none;
+  }
+
+  .confetti {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    animation: confetti-burst 0.8s ease-out forwards;
+  }
+
+  @keyframes confetti-burst {
+    0% {
+      transform: translate(-50%, -50%) scale(0);
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+
+  .confetti:nth-child(1) { background: #ffd55c; animation-delay: 0s; --confetti-x: -40px; --confetti-y: -60px; }
+  .confetti:nth-child(2) { background: #22c55e; animation-delay: 0.05s; --confetti-x: 40px; --confetti-y: -50px; }
+  .confetti:nth-child(3) { background: #ffd55c; animation-delay: 0.1s; --confetti-x: -60px; --confetti-y: 10px; }
+  .confetti:nth-child(4) { background: #22c55e; animation-delay: 0.15s; --confetti-x: 60px; --confetti-y: 20px; }
+  .confetti:nth-child(5) { background: #ffd55c; animation-delay: 0.2s; --confetti-x: 0px; --confetti-y: -70px; }
+  .confetti:nth-child(6) { background: #22c55e; animation-delay: 0.25s; --confetti-x: -30px; --confetti-y: 40px; }
+  .confetti:nth-child(7) { background: #ffd55c; animation-delay: 0.3s; --confetti-x: 30px; --confetti-y: 50px; }
+  .confetti:nth-child(8) { background: #22c55e; animation-delay: 0.35s; --confetti-x: -50px; --confetti-y: -30px; }
+
+  .confetti:nth-child(1) { animation-name: confetti-1; }
+  .confetti:nth-child(2) { animation-name: confetti-2; }
+  .confetti:nth-child(3) { animation-name: confetti-3; }
+  .confetti:nth-child(4) { animation-name: confetti-4; }
+  .confetti:nth-child(5) { animation-name: confetti-5; }
+  .confetti:nth-child(6) { animation-name: confetti-6; }
+  .confetti:nth-child(7) { animation-name: confetti-7; }
+  .confetti:nth-child(8) { animation-name: confetti-8; }
+
+  @keyframes confetti-1 { 0% { transform: translate(-50%, -50%) scale(0) rotate(0deg); } 100% { transform: translate(-40px, -60px) scale(1) rotate(360deg); opacity: 0; } }
+  @keyframes confetti-2 { 0% { transform: translate(-50%, -50%) scale(0) rotate(0deg); } 100% { transform: translate(40px, -50px) scale(1) rotate(-360deg); opacity: 0; } }
+  @keyframes confetti-3 { 0% { transform: translate(-50%, -50%) scale(0) rotate(0deg); } 100% { transform: translate(-60px, 10px) scale(1) rotate(270deg); opacity: 0; } }
+  @keyframes confetti-4 { 0% { transform: translate(-50%, -50%) scale(0) rotate(0deg); } 100% { transform: translate(60px, 20px) scale(1) rotate(-270deg); opacity: 0; } }
+  @keyframes confetti-5 { 0% { transform: translate(-50%, -50%) scale(0) rotate(0deg); } 100% { transform: translate(0px, -70px) scale(1) rotate(180deg); opacity: 0; } }
+  @keyframes confetti-6 { 0% { transform: translate(-50%, -50%) scale(0) rotate(0deg); } 100% { transform: translate(-30px, 40px) scale(1) rotate(-180deg); opacity: 0; } }
+  @keyframes confetti-7 { 0% { transform: translate(-50%, -50%) scale(0) rotate(0deg); } 100% { transform: translate(30px, 50px) scale(1) rotate(90deg); opacity: 0; } }
+  @keyframes confetti-8 { 0% { transform: translate(-50%, -50%) scale(0) rotate(0deg); } 100% { transform: translate(-50px, -30px) scale(1) rotate(-90deg); opacity: 0; } }
+
+  /* Copy success feedback */
+  .copy-feedback {
+    animation: copy-feedback 1.5s ease-out forwards;
+  }
+
+  @keyframes copy-feedback {
+    0% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    70% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+  }
+
   /* Button press effect */
   .btn-press {
     transition: transform 0.1s ease, box-shadow 0.1s ease;

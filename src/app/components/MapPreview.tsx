@@ -37,7 +37,8 @@ export default function MapPreview({
   const [mapLoaded, setMapLoaded] = useState(false);
 
   // Jersey center coordinates (stable reference to avoid re-renders)
-  const jerseyCenter = useRef<[number, number]>([-2.13, 49.21]);
+  // Centered on St Helier, Jersey
+  const jerseyCenter = useRef<[number, number]>([-2.1075, 49.1880]);
 
   // Create custom marker element (defined before useEffect to avoid "accessed before declared" error)
   function createMarkerElement(
@@ -90,7 +91,7 @@ export default function MapPreview({
       container: mapContainer.current,
       style: "mapbox://styles/mapbox/dark-v11",
       center: jerseyCenter.current,
-      zoom: 11,
+      zoom: 12, // Good overview of Jersey
       attributionControl: false, // We will re-add manually to top-left
     });
 
@@ -216,11 +217,27 @@ export default function MapPreview({
 
     // Fit bounds if we have points
     if (hasPoints) {
-      map.current.fitBounds(bounds, {
-        padding: { top: 50, bottom: 50, left: 50, right: 50 },
-        maxZoom: 14,
-        duration: 500,
-      });
+      // Check if bounds are valid (not a single point)
+      const ne = bounds.getNorthEast();
+      const sw = bounds.getSouthWest();
+      const isSinglePoint = ne.lng === sw.lng && ne.lat === sw.lat;
+
+      if (isSinglePoint) {
+        // Single point - center on it with a reasonable zoom
+        map.current.flyTo({
+          center: [ne.lng, ne.lat],
+          zoom: 14,
+          duration: 500,
+        });
+      } else {
+        // Multiple points - fit to bounds with padding
+        map.current.fitBounds(bounds, {
+          padding: { top: 60, bottom: 60, left: 60, right: 60 },
+          maxZoom: 15,
+          duration: 800,
+          essential: true,
+        });
+      }
     }
   }, [pickup, stops, dropoff, mapLoaded]);
 
@@ -236,6 +253,19 @@ export default function MapPreview({
         type: "Feature",
         properties: {},
         geometry: route,
+      });
+
+      // Fit map to route bounds
+      const routeBounds = new mapboxgl.LngLatBounds();
+      route.coordinates.forEach((coord) => {
+        routeBounds.extend(coord as [number, number]);
+      });
+      
+      map.current.fitBounds(routeBounds, {
+        padding: { top: 60, bottom: 60, left: 60, right: 60 },
+        maxZoom: 15,
+        duration: 800,
+        essential: true,
       });
     } else {
       // Clear route
@@ -268,11 +298,11 @@ export default function MapPreview({
   }
 
   return (
-    <div className="relative rounded-xl overflow-hidden shadow-lg border border-[#c9a962]/20">
-      {/* Map container - responsive height: 240px mobile → 380px desktop */}
+    <div className="relative rounded-xl overflow-hidden shadow-lg border border-[#c9a962]/20 h-full">
+      {/* Map container - responsive height: 240px mobile → full on desktop */}
       <div
         ref={mapContainer}
-        className="w-full h-60 sm:h-72 md:h-80 lg:h-96"
+        className="w-full h-60 sm:h-72 md:h-80 lg:h-full"
         style={{ minHeight: "240px" }}
       />
 
@@ -310,12 +340,35 @@ export default function MapPreview({
         </div>
       )}
 
-      {/* Empty state */}
-      {!pickup?.lat && !dropoff?.lat && (
-        <div className="absolute inset-0 flex items-center justify-center bg-[#1a1f1e]/60 backdrop-blur-sm">
-          <div className="text-center text-[#9ba39b]">
+      {/* Map loading skeleton */}
+      {!mapLoaded && (
+        <div className="absolute inset-0 bg-[#1a1f1e]">
+          {/* Skeleton grid pattern */}
+          <div className="absolute inset-0 opacity-10" style={{
+            backgroundImage: `
+              linear-gradient(#c9a962 1px, transparent 1px),
+              linear-gradient(90deg, #c9a962 1px, transparent 1px)
+            `,
+            backgroundSize: '40px 40px'
+          }} />
+          {/* Shimmer overlay */}
+          <div className="absolute inset-0 skeleton" style={{ background: 'transparent' }} />
+          {/* Loading indicator */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-center">
+              <div className="w-8 h-8 border-2 border-[#c9a962]/30 border-t-[#c9a962] rounded-full animate-spin mx-auto mb-2" />
+              <p className="text-xs text-[#666]">Loading map...</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Empty state hint - shows at bottom, doesn't cover the map */}
+      {mapLoaded && !pickup?.lat && !dropoff?.lat && (
+        <div className="absolute bottom-3 left-3 right-3">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#1a1f1e]/90 backdrop-blur-sm border border-[#c9a962]/20 text-[#9ba39b]">
             <svg
-              className="w-8 h-8 mx-auto mb-2 text-[#c9a962]/50"
+              className="w-4 h-4 text-[#c9a962]/70 flex-shrink-0"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -324,7 +377,7 @@ export default function MapPreview({
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
               <circle cx="12" cy="10" r="3" />
             </svg>
-            <p className="text-sm">Enter locations to see route preview</p>
+            <p className="text-xs">Enter pickup & destination to see your route</p>
           </div>
         </div>
       )}

@@ -386,10 +386,55 @@ export default function CorporatePassengersPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-[#ffd55c]/30 border-t-[#ffd55c] rounded-full animate-spin" />
-          <p className="text-sm text-[#888]">Loading passengers...</p>
+      <div className="space-y-6">
+        {/* Header Skeleton */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="skeleton h-6 w-40 rounded mb-2" />
+            <div className="skeleton h-4 w-28 rounded" />
+          </div>
+          <div className="skeleton h-10 w-36 rounded-lg" />
+        </div>
+
+        {/* Filters Skeleton */}
+        <div className="bg-[#1b1b1b] p-4 rounded-lg border border-[#333]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2">
+              <div className="skeleton h-3 w-16 rounded mb-2" />
+              <div className="skeleton h-10 w-full rounded-lg" />
+            </div>
+            <div>
+              <div className="skeleton h-3 w-20 rounded mb-2" />
+              <div className="skeleton h-10 w-full rounded-lg" />
+            </div>
+          </div>
+        </div>
+
+        {/* Passenger Cards Skeleton */}
+        <div className="space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="bg-[#1b1b1b] rounded-lg border border-[#333] p-4"
+              style={{ animationDelay: `${i * 100}ms` }}
+            >
+              <div className="flex items-center gap-4">
+                <div className="skeleton w-10 h-10 rounded-full" />
+                <div className="flex-1 space-y-2">
+                  <div className="skeleton h-4 w-32 rounded" />
+                  <div className="skeleton h-3 w-20 rounded" />
+                </div>
+                <div className="flex gap-2">
+                  <div className="skeleton h-8 w-8 rounded" />
+                  <div className="skeleton h-8 w-8 rounded" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 mt-4">
+                <div className="skeleton h-3 w-24 rounded" />
+                <div className="skeleton h-3 w-16 rounded" />
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );
