@@ -1,12 +1,14 @@
 "use client";
 
 export default function GlobalError({
-  error,
+  error: _error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  // _error is available for logging but not displayed to user
+  void _error;
   return (
     <html>
       <body>

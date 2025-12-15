@@ -86,6 +86,27 @@ interface RouteNode {
   info: { all: string };
 }
 
+// Stop interface for booking request
+interface BookingStop {
+  address?: string;
+  lat?: number;
+  lng?: number;
+}
+
+// Request body interface
+interface BookingRequestBody {
+  pickup: { address?: string; lat: number; lng: number };
+  dropoff: { address?: string; lat: number; lng: number };
+  stops?: BookingStop[];
+  rider: { name: string; phone: string; email?: string };
+  when: { type: "asap" | "scheduled"; time?: string };
+  vehicle_type?: string;
+  vehicleType?: string;
+  notes?: string;
+  passengers?: number;
+  luggage?: number;
+}
+
 function buildRouteNodes({
   pickupAddress,
   pickupLat,
@@ -162,7 +183,7 @@ function buildRouteNodes({
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const body = await req.json() as BookingRequestBody;
 
     // Validate pickup coordinates
     if (!body.pickup?.lat || !body.pickup?.lng) {
@@ -240,8 +261,8 @@ export async function POST(req: Request) {
 
     // Build stops array
     const stops = (body.stops || [])
-      .filter((s: any) => s.address || (s.lat && s.lng))
-      .map((s: any) => ({
+      .filter((s: BookingStop) => s.address || (s.lat && s.lng))
+      .map((s: BookingStop) => ({
         address: s.address || "",
         lat: s.lat,
         lng: s.lng,
@@ -349,10 +370,11 @@ export async function POST(req: Request) {
       taxicaller: parsed,
     });
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("❌ Booking API error:", err);
+    const message = err instanceof Error ? err.message : "Booking failed";
     return NextResponse.json(
-      { ok: false, error: err.message || "Booking failed" },
+      { ok: false, error: message },
       { status: 500 }
     );
   }

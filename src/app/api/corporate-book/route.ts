@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 
+// Route node structure for TaxiCaller API
+interface TCRouteNode {
+  seq: number;
+  actions: { "@type": string; item_seq: number; action: string }[];
+  location: {
+    name: string;
+    coords: number[];
+  };
+  times: { arrive: { target: number; latest: number } } | null;
+  info: { all: string };
+}
+
 // ---- TaxiCaller env ----
 const TC_DOMAIN =
 process.env.TAXICALLER_API_DOMAIN || 'api-rc.taxicaller.net';
@@ -123,7 +135,7 @@ function buildRouteNodes({
     const dropoff = normPoint(dropoffAddress, dropoffLat, dropoffLng);
 
     let seq = 0;
-    const nodes: any[] = [];
+    const nodes: TCRouteNode[] = [];
 
     // Pickup
     nodes.push({
@@ -250,7 +262,7 @@ export async function POST(req: NextRequest) {
         const bookerJwt = await getBookerToken();
 
         const stopNames: string[] = Array.isArray(stops)
-        ? stops.map((s: any) => String(s || '')).filter(Boolean)
+        ? stops.map((s: unknown) => String(s || '')).filter(Boolean)
         : [];
 
         const nodes = buildRouteNodes({
@@ -323,17 +335,27 @@ export async function POST(req: NextRequest) {
             },
             { status: 200 }
         );
-    } catch (err: any) {
-        const status = err?.response?.status;
-        const detail = err?.response?.data || err?.message;
+    } catch (err: unknown) {
+        let status: number | undefined;
+        let detail: unknown;
+        if (axios.isAxiosError(err)) {
+            status = err.response?.status;
+            detail = err.response?.data || err.message;
+        } else if (err instanceof Error) {
+            detail = err.message;
+        }
         console.error('Corporate booking error:', status, detail);
+
+        const errorMessage = typeof detail === 'object' && detail !== null && 'message' in detail 
+            ? String((detail as { message: unknown }).message)
+            : typeof detail === 'string' 
+                ? detail 
+                : 'Corporate booking failed';
 
         return NextResponse.json(
             {
                 success: false,
-                error:
-                (detail && (detail.message || String(detail))) ||
-                'Corporate booking failed',
+                error: errorMessage,
             },
             { status: 500 }
         );

@@ -328,8 +328,9 @@ export default function CorporatePassengersPage() {
       }
 
       closeModal();
-    } catch (err: any) {
-      setSaveError(err.message || "Failed to save passenger");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to save passenger";
+      setSaveError(message);
     } finally {
       setIsSaving(false);
     }

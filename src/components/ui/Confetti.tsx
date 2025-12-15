@@ -3,7 +3,7 @@
 
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 
 interface Particle {
   id: number;
@@ -43,6 +43,8 @@ export default function Confetti({
   colors = DEFAULT_COLORS,
 }: ConfettiProps) {
   const [particles, setParticles] = useState<Particle[]>([]);
+  const wasActiveRef = useRef(isActive);
+  const animationRef = useRef<number | undefined>(undefined);
 
   const createParticles = useCallback(() => {
     const newParticles: Particle[] = [];
@@ -70,15 +72,22 @@ export default function Confetti({
   }, [particleCount, colors]);
 
   useEffect(() => {
+    // Clear when transitioning from active to inactive
+    if (!isActive && wasActiveRef.current) {
+      wasActiveRef.current = false;
+      queueMicrotask(() => setParticles([]));
+      return;
+    }
+    
     if (!isActive) {
-      setParticles([]);
       return;
     }
 
-    setParticles(createParticles());
+    wasActiveRef.current = true;
+    // Defer initial particles creation to avoid sync setState in effect
+    queueMicrotask(() => setParticles(createParticles()));
 
-    let animationFrame: number;
-    let startTime = Date.now();
+    const startTime = Date.now();
 
     const animate = () => {
       const elapsed = Date.now() - startTime;
@@ -99,17 +108,17 @@ export default function Confetti({
       );
 
       if (progress < 1) {
-        animationFrame = requestAnimationFrame(animate);
+        animationRef.current = requestAnimationFrame(animate);
       } else {
         onComplete?.();
       }
     };
 
-    animationFrame = requestAnimationFrame(animate);
+    animationRef.current = requestAnimationFrame(animate);
 
     return () => {
-      if (animationFrame) {
-        cancelAnimationFrame(animationFrame);
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
       }
     };
   }, [isActive, createParticles, duration, onComplete]);

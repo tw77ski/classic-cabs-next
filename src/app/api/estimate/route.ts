@@ -65,8 +65,9 @@ export async function POST(req: Request) {
     console.log("✅ TaxiCaller estimate success");
     return NextResponse.json(parsed);
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("❌ Estimate API error:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    const message = err instanceof Error ? err.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

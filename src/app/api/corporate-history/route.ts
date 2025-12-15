@@ -2,6 +2,37 @@
 // Fetches completed job history for a corporate account
 import { NextRequest, NextResponse } from "next/server";
 
+// Raw job structure from TaxiCaller API
+interface TCRawJob {
+    id?: string | number;
+    job_id?: string | number;
+    order_id?: string | number;
+    ref?: string;
+    reference?: string;
+    status?: string;
+    pickup_time?: number | string;
+    created_at?: string;
+    from?: { name?: string };
+    to?: { name?: string };
+    pickup?: { name?: string };
+    dropoff?: { name?: string };
+    pickup_address?: string;
+    dropoff_address?: string;
+    price_total?: number;
+    fare?: number;
+    total?: number;
+}
+
+// Mapped job structure
+interface MappedJob {
+    id: string | number;
+    ref: string;
+    pickup_time: string;
+    from: string;
+    to: string;
+    fare: number;
+}
+
 // ---- TaxiCaller env ----
 const TC_DOMAIN = process.env.TAXICALLER_API_DOMAIN || "api-rc.taxicaller.net";
 const TC_COMPANY_ID = Number(process.env.TAXICALLER_COMPANY_ID);
@@ -170,11 +201,11 @@ export async function GET(req: NextRequest) {
                         : [];
 
         // Map to dashboard format
-        const jobs = rawJobs
-            .filter((j: any) => j.status === "completed" || j.status === "finished")
-            .map((j: any) => ({
-                id: j.id || j.job_id || j.order_id,
-                ref: j.ref || j.reference || j.job_id || "",
+        const jobs: MappedJob[] = (rawJobs as TCRawJob[])
+            .filter((j: TCRawJob) => j.status === "completed" || j.status === "finished")
+            .map((j: TCRawJob) => ({
+                id: j.id || j.job_id || j.order_id || "",
+                ref: j.ref || j.reference || String(j.job_id || ""),
                 pickup_time: j.pickup_time
                     ? new Date((typeof j.pickup_time === "number" ? j.pickup_time * 1000 : j.pickup_time)).toISOString()
                     : j.created_at || "",
@@ -183,7 +214,7 @@ export async function GET(req: NextRequest) {
                 fare: j.price_total || j.fare || j.total || 0,
             }));
 
-        const totalFare = jobs.reduce((sum: number, j: any) => sum + (j.fare || 0), 0);
+        const totalFare = jobs.reduce((sum: number, j: MappedJob) => sum + (j.fare || 0), 0);
 
         return NextResponse.json({
             success: true,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback, useRef, useLayoutEffect } from "react";
 
 interface DateTimeInputProps {
   value: string; // ISO format: YYYY-MM-DDTHH:MM
@@ -9,6 +9,25 @@ interface DateTimeInputProps {
   label?: string;
   required?: boolean;
   error?: boolean;
+}
+
+// Helper to parse ISO string
+function parseISOValue(value: string): { date: string; time: string } {
+  if (!value) return { date: "", time: "" };
+  try {
+    const date = new Date(value);
+    if (!isNaN(date.getTime())) {
+      const day = String(date.getDate()).padStart(2, "0");
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const year = date.getFullYear();
+      const hours = String(date.getHours()).padStart(2, "0");
+      const minutes = String(date.getMinutes()).padStart(2, "0");
+      return { date: `${day}/${month}/${year}`, time: `${hours}:${minutes}` };
+    }
+  } catch {
+    // Invalid date
+  }
+  return { date: "", time: "" };
 }
 
 export default function DateTimeInput({
@@ -20,30 +39,21 @@ export default function DateTimeInput({
   error = false,
 }: DateTimeInputProps) {
   // Parse the ISO value into date and time parts
-  const [dateValue, setDateValue] = useState("");
-  const [timeValue, setTimeValue] = useState("");
+  const initial = parseISOValue(value);
+  const [dateValue, setDateValue] = useState(initial.date);
+  const [timeValue, setTimeValue] = useState(initial.time);
+  const prevValueRef = useRef(value);
 
-  // Parse ISO string to dd/mm/yyyy and HH:mm
-  useEffect(() => {
-    if (value) {
-      try {
-        const date = new Date(value);
-        if (!isNaN(date.getTime())) {
-          const day = String(date.getDate()).padStart(2, "0");
-          const month = String(date.getMonth() + 1).padStart(2, "0");
-          const year = date.getFullYear();
-          const hours = String(date.getHours()).padStart(2, "0");
-          const minutes = String(date.getMinutes()).padStart(2, "0");
-          
-          setDateValue(`${day}/${month}/${year}`);
-          setTimeValue(`${hours}:${minutes}`);
-        }
-      } catch {
-        // Invalid date, leave empty
-      }
-    } else {
-      setDateValue("");
-      setTimeValue("");
+  // Sync with external value changes (using useLayoutEffect to avoid flicker)
+  useLayoutEffect(() => {
+    if (value !== prevValueRef.current) {
+      prevValueRef.current = value;
+      const parsed = parseISOValue(value);
+      // Defer state updates to avoid cascading renders
+      queueMicrotask(() => {
+        setDateValue(parsed.date);
+        setTimeValue(parsed.time);
+      });
     }
   }, [value]);
 

@@ -176,8 +176,8 @@ export default function CorporatePage() {
     setSelectedTraveler(traveler);
   }
 
-  // Use traveler's saved address for pickup or dropoff
-  function useTravelerAddress(addressType: "home" | "work", target: "pickup" | "dropoff") {
+  // Apply traveler's saved address for pickup or dropoff
+  function applyTravelerAddress(addressType: "home" | "work", target: "pickup" | "dropoff") {
     if (!selectedTraveler) return;
     
     const address = addressType === "home" 
@@ -691,7 +691,7 @@ export default function CorporatePage() {
                         <div className="flex gap-1">
                           <button
                             type="button"
-                            onClick={() => useTravelerAddress("home", "pickup")}
+                            onClick={() => applyTravelerAddress("home", "pickup")}
                             className="px-2 py-1 text-xs bg-[#111] border border-[#333] rounded hover:border-[#ffd55c]/50 text-[#ccc] transition flex items-center gap-1"
                             title={selectedTraveler.homeAddress.address}
                           >
@@ -702,7 +702,7 @@ export default function CorporatePage() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => useTravelerAddress("home", "dropoff")}
+                            onClick={() => applyTravelerAddress("home", "dropoff")}
                             className="px-2 py-1 text-xs bg-[#111] border border-[#333] rounded hover:border-[#ffd55c]/50 text-[#ccc] transition flex items-center gap-1"
                             title={selectedTraveler.homeAddress.address}
                           >
@@ -714,7 +714,7 @@ export default function CorporatePage() {
                         <div className="flex gap-1">
                           <button
                             type="button"
-                            onClick={() => useTravelerAddress("work", "pickup")}
+                            onClick={() => applyTravelerAddress("work", "pickup")}
                             className="px-2 py-1 text-xs bg-[#111] border border-[#333] rounded hover:border-[#ffd55c]/50 text-[#ccc] transition flex items-center gap-1"
                             title={selectedTraveler.workAddress.address}
                           >
@@ -725,7 +725,7 @@ export default function CorporatePage() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => useTravelerAddress("work", "dropoff")}
+                            onClick={() => applyTravelerAddress("work", "dropoff")}
                             className="px-2 py-1 text-xs bg-[#111] border border-[#333] rounded hover:border-[#ffd55c]/50 text-[#ccc] transition flex items-center gap-1"
                             title={selectedTraveler.workAddress.address}
                           >

@@ -9,6 +9,7 @@ import {
   useEffect,
   useState,
   useCallback,
+  useRef,
   ReactNode,
 } from "react";
 
@@ -22,22 +23,30 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
+// Get initial theme outside of component to avoid effect
+function getInitialTheme(): Theme {
+  if (typeof window === 'undefined') return "dark";
+  const savedTheme = localStorage.getItem("theme") as Theme | null;
+  if (savedTheme) return savedTheme;
+  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  return prefersDark ? "dark" : "light";
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>("dark");
   const [mounted, setMounted] = useState(false);
+  const initializedRef = useRef(false);
 
-  // Load theme from localStorage on mount
+  // Initialize theme from localStorage (runs once after mount)
   useEffect(() => {
-    setMounted(true);
-    const savedTheme = localStorage.getItem("theme") as Theme | null;
+    if (initializedRef.current) return;
+    initializedRef.current = true;
     
-    if (savedTheme) {
-      setThemeState(savedTheme);
-    } else {
-      // Check system preference
-      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      setThemeState(prefersDark ? "dark" : "light");
-    }
+    // Use queueMicrotask to defer state updates
+    queueMicrotask(() => {
+      setMounted(true);
+      setThemeState(getInitialTheme());
+    });
   }, []);
 
   // Apply theme to document

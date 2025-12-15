@@ -3,7 +3,7 @@
 
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { getRecentPassengers, RecentPassenger, searchPassengers } from "@/lib/recentPassengers";
 
 interface PassengerInputProps {
@@ -29,41 +29,41 @@ export default function PassengerInput({
   onEmailChange,
   onSelectPassenger,
 }: PassengerInputProps) {
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [suggestions, setSuggestions] = useState<RecentPassenger[]>([]);
-  const [recentPassengers, setRecentPassengers] = useState<RecentPassenger[]>([]);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Load recent passengers on mount
-  useEffect(() => {
-    setRecentPassengers(getRecentPassengers());
+  // Load recent passengers eagerly (only runs on client)
+  const recentPassengers = useMemo(() => {
+    if (typeof window !== 'undefined') {
+      return getRecentPassengers();
+    }
+    return [];
   }, []);
 
-  // Update suggestions based on input
-  useEffect(() => {
+  // Compute suggestions based on input and focus state
+  const suggestions = useMemo<RecentPassenger[]>(() => {
     if (focusedField === "firstName" && firstName.length >= 2) {
-      const results = searchPassengers(firstName);
-      setSuggestions(results);
-      setShowSuggestions(results.length > 0);
+      return searchPassengers(firstName);
     } else if (focusedField === "lastName" && lastName.length >= 2) {
-      const results = searchPassengers(lastName);
-      setSuggestions(results);
-      setShowSuggestions(results.length > 0);
+      return searchPassengers(lastName);
     } else if (focusedField === "firstName" && firstName.length === 0 && recentPassengers.length > 0) {
       // Show recent passengers when field is empty and focused
-      setSuggestions(recentPassengers.slice(0, 5));
-      setShowSuggestions(true);
-    } else {
-      setShowSuggestions(false);
+      return recentPassengers.slice(0, 5);
     }
+    return [];
   }, [firstName, lastName, focusedField, recentPassengers]);
+
+  // Derive showSuggestions from state (not from effect)
+  const showSuggestions = isDropdownOpen && 
+    (focusedField === "firstName" || focusedField === "lastName") && 
+    suggestions.length > 0;
 
   // Close suggestions when clicking outside
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setShowSuggestions(false);
+        setIsDropdownOpen(false);
         setFocusedField(null);
       }
     }
@@ -78,7 +78,7 @@ export default function PassengerInput({
     if (passenger.email) {
       onEmailChange(passenger.email);
     }
-    setShowSuggestions(false);
+    setIsDropdownOpen(false);
     setFocusedField(null);
     onSelectPassenger?.(passenger);
   }
@@ -123,7 +123,7 @@ export default function PassengerInput({
             placeholder="First name"
             value={firstName}
             onChange={(e) => onFirstNameChange(e.target.value)}
-            onFocus={() => setFocusedField("firstName")}
+            onFocus={() => { setFocusedField("firstName"); setIsDropdownOpen(true); }}
             className="w-full px-3 py-2 text-sm bg-[#111] border border-[#333] rounded-lg text-[#f5f5f5] placeholder-[#555] focus:outline-none focus:border-[#ffd55c]/50"
           />
           
@@ -167,7 +167,7 @@ export default function PassengerInput({
             placeholder="Last name"
             value={lastName}
             onChange={(e) => onLastNameChange(e.target.value)}
-            onFocus={() => setFocusedField("lastName")}
+            onFocus={() => { setFocusedField("lastName"); setIsDropdownOpen(true); }}
             onBlur={() => setTimeout(() => setFocusedField(null), 200)}
             className="w-full px-3 py-2 text-sm bg-[#111] border border-[#333] rounded-lg text-[#f5f5f5] placeholder-[#555] focus:outline-none focus:border-[#ffd55c]/50"
           />

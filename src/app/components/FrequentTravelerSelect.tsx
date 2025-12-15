@@ -19,7 +19,14 @@ interface FrequentTravelerSelectProps {
 }
 
 export default function FrequentTravelerSelect({ onSelect, selectedId }: FrequentTravelerSelectProps) {
-  const [travelers, setTravelers] = useState<FrequentTraveler[]>([]);
+  // Initialize travelers from localStorage immediately
+  const [travelers, setTravelers] = useState<FrequentTraveler[]>(() => {
+    // Only run on client side
+    if (typeof window !== 'undefined') {
+      return getFrequentTravelers();
+    }
+    return [];
+  });
   const [searchQuery, setSearchQuery] = useState("");
   const [showManage, setShowManage] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -36,11 +43,6 @@ export default function FrequentTravelerSelect({ onSelect, selectedId }: Frequen
     department: "",
     notes: "",
   });
-
-  // Load travelers
-  useEffect(() => {
-    setTravelers(getFrequentTravelers());
-  }, []);
 
   // Filter travelers based on search
   const filteredTravelers = searchQuery

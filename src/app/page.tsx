@@ -376,8 +376,9 @@ export default function Page() {
         isMultiseater: result.isMultiseater,
         breakdown: result.breakdown,
       });
-    } catch (err: any) {
-      setError(err.message || "Failed to calculate estimate");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to calculate estimate";
+      setError(message);
     } finally {
       setIsLoading(false);
     }
@@ -457,8 +458,9 @@ export default function Page() {
         // Celebrate with confetti!
         confetti.trigger();
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to create booking");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to create booking";
+      setError(message);
     } finally {
       setIsLoading(false);
     }
@@ -492,8 +494,9 @@ export default function Page() {
       } else {
         setError(data?.error || "Failed to cancel booking");
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to cancel booking");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to cancel booking";
+      setError(message);
     } finally {
       setIsCancelling(false);
     }
@@ -541,9 +544,10 @@ export default function Page() {
           error: data?.error || "Failed to cancel booking",
         });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to cancel booking";
       setStandaloneCancelResult({
-        error: err.message || "Failed to cancel booking",
+        error: message,
       });
     } finally {
       setIsCancellingStandalone(false);
@@ -583,7 +587,7 @@ export default function Page() {
     try {
       // For amendment, we need current pickup/dropoff - use form values if available
       // Otherwise, the API will need the full details
-      const amendPayload: any = {
+      const amendPayload: Record<string, unknown> = {
         job_id: amendBookingId.trim(),
         pickup_time: new Date(amendPickupTime).toISOString(),
       };
@@ -642,9 +646,10 @@ export default function Page() {
           error: data.error || "Failed to amend booking",
         });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to amend booking";
       setAmendResult({
-        error: err.message || "Failed to amend booking",
+        error: message,
       });
     } finally {
       setIsAmending(false);
@@ -708,18 +713,17 @@ export default function Page() {
         </section>
 
         {/* ===== SECTION 2: Map Preview (Mobile Only) ===== */}
-        {(pickupCoords || dropoffCoords || stopCoords.length > 0) && (
-          <section className="rounded-lg overflow-hidden border border-[#333] lg:hidden">
-            <MapPreview
-              pickup={pickupCoords}
-              stops={stopCoords}
-              dropoff={dropoffCoords}
-              route={routeData?.geometry}
-              distance={routeData?.distance}
-              duration={routeData?.duration}
-            />
-          </section>
-        )}
+        <section className="rounded-lg overflow-hidden border border-[#333] lg:hidden">
+          <MapPreview
+            pickup={pickupCoords}
+            stops={stopCoords}
+            dropoff={dropoffCoords}
+            route={routeData?.geometry}
+            distance={routeData?.distance}
+            duration={routeData?.duration}
+            showNearbyDrivers={!bookingResult}
+          />
+        </section>
 
         {/* ===== SECTION 3: When ===== */}
         <section className="bg-[#1b1b1b] p-4 rounded-lg border border-[#333] mt-4 mb-6">
@@ -1452,6 +1456,7 @@ export default function Page() {
                 route={routeData?.geometry}
                 distance={routeData?.distance}
                 duration={routeData?.duration}
+                showNearbyDrivers={!bookingResult}
               />
             </div>
             

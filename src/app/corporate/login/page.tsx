@@ -5,6 +5,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function CorporateLoginPage() {
   const router = useRouter();
@@ -175,9 +176,9 @@ export default function CorporateLoginPage() {
 
         {/* Back to main site */}
         <div className="mt-6 text-center">
-          <a href="/" className="text-sm text-[#666] hover:text-[#888] transition">
+          <Link href="/" className="text-sm text-[#666] hover:text-[#888] transition">
             ← Back to main site
-          </a>
+          </Link>
         </div>
       </div>
     </div>

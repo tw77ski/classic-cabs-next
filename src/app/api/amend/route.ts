@@ -247,10 +247,11 @@ export async function POST(req: Request) {
       taxicaller: bookData,
     });
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("❌ Amendment error:", err);
+    const message = err instanceof Error ? err.message : "Amendment failed";
     return NextResponse.json(
-      { ok: false, error: err.message || "Amendment failed" },
+      { ok: false, error: message },
       { status: 500 }
     );
   }
@@ -258,7 +259,7 @@ export async function POST(req: Request) {
 
 // Build payload for direct update attempt
 function buildUpdatePayload(body: AmendRequest) {
-  const payload: any = {
+  const payload: Record<string, unknown> = {
     company_id: TC_COMPANY_ID,
   };
 
@@ -291,13 +292,25 @@ function buildUpdatePayload(body: AmendRequest) {
   return payload;
 }
 
+// Node structure for TaxiCaller API
+interface TCRouteNode {
+  seq: number;
+  actions: { "@type": string; item_seq: number; action: string }[];
+  location: {
+    name: string;
+    coords: number[];
+  };
+  times: { arrive: { target: number; latest: number } } | null;
+  info: { all: string };
+}
+
 // Build full booking payload for cancel & rebook
 function buildNewBookingPayload(body: AmendRequest) {
   const pickupUnix = body.pickup_time 
     ? Math.floor(new Date(body.pickup_time).getTime() / 1000)
     : 0;
 
-  const nodes: any[] = [];
+  const nodes: TCRouteNode[] = [];
   let seq = 0;
 
   // Pickup node

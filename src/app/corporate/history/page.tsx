@@ -91,8 +91,9 @@ export default function CorporateHistoryPage() {
         }
 
         setHistory(data);
-      } catch (err: any) {
-        setError(err.message || "Failed to load history");
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Failed to load history";
+        setError(message);
       } finally {
         setIsLoading(false);
       }

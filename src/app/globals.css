@@ -921,3 +921,91 @@
   transform: translate(10px, -40px) !important;
   opacity: 0.4 !important;
 }
+
+/* ============================================
+   LIVE DRIVER TRACKING MARKERS
+   ============================================ */
+
+/* Driver pulse animation */
+@keyframes driverPulse {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.3);
+    opacity: 0.3;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.6);
+    opacity: 0;
+  }
+}
+
+/* Driver marker base styles */
+.driver-marker {
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.driver-marker:hover {
+  transform: scale(1.1);
+  z-index: 10 !important;
+}
+
+.assigned-driver-marker {
+  cursor: pointer;
+  transition: transform 0.2s ease;
+  z-index: 100 !important;
+}
+
+.assigned-driver-marker:hover {
+  transform: scale(1.1);
+}
+
+/* Driver popup styles */
+.driver-popup .mapboxgl-popup-content {
+  background: #1a1f1e !important;
+  border: 1px solid rgba(201, 169, 98, 0.3) !important;
+  border-radius: 10px !important;
+  padding: 0 !important;
+  box-shadow: 
+    0 0 12px rgba(255, 215, 130, 0.1),
+    0 4px 12px rgba(0, 0, 0, 0.6) !important;
+}
+
+.driver-popup.assigned .mapboxgl-popup-content {
+  border-color: rgba(34, 197, 94, 0.4) !important;
+  box-shadow: 
+    0 0 12px rgba(34, 197, 94, 0.15),
+    0 4px 12px rgba(0, 0, 0, 0.6) !important;
+}
+
+.driver-popup .mapboxgl-popup-tip {
+  border-top-color: #1a1f1e !important;
+}
+
+/* Car icon rotation animation */
+@keyframes carRotate {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+/* Smooth position transition for markers */
+.mapboxgl-marker {
+  transition: transform 0.5s ease-out;
+}
+
+/* ETA badge animation */
+@keyframes etaBounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}

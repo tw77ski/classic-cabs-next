@@ -1,10 +1,28 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ui/ThemeProvider";
+import { PWAProvider } from "@/components/pwa/PWAProvider";
 
 export const metadata: Metadata = {
   title: "Classic Cabs",
-  description: "Classic Cabs – Premium taxi booking service",
+  description: "Classic Cabs – Premium taxi booking service in Jersey",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Classic Cabs",
+  },
+  formatDetection: {
+    telephone: true,
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-capable": "yes",
+    "application-name": "Classic Cabs",
+    "apple-mobile-web-app-title": "Classic Cabs",
+    "msapplication-TileColor": "#ffd55c",
+    "msapplication-tap-highlight": "no",
+  },
 };
 
 export const viewport: Viewport = {
@@ -32,6 +50,21 @@ const themeScript = `
   })();
 `;
 
+// Service worker registration script
+const swScript = `
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+      navigator.serviceWorker.register('/sw.js')
+        .then(function(registration) {
+          console.log('SW registered:', registration.scope);
+        })
+        .catch(function(error) {
+          console.log('SW registration failed:', error);
+        });
+    });
+  }
+`;
+
 export default function RootLayout({
   children,
 }: {
@@ -42,7 +75,10 @@ export default function RootLayout({
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-96x96.png" />
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script dangerouslySetInnerHTML={{ __html: swScript }} />
       </head>
       <body 
         className="antialiased"
@@ -52,7 +88,9 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <ThemeProvider>
-          {children}
+          <PWAProvider>
+            {children}
+          </PWAProvider>
         </ThemeProvider>
       </body>
     </html>

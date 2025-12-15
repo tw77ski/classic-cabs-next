@@ -2,6 +2,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 
+// TaxiCaller account response types
+interface TCAccountRaw {
+  id?: number;
+  cname?: string;
+  company?: string;
+  name?: string;
+}
+
+interface TCAccountsResponse {
+  list?: TCAccountRaw[];
+  accounts?: TCAccountRaw[];
+}
+
 // ---- TaxiCaller env ----
 const TC_DOMAIN =
 process.env.TAXICALLER_API_DOMAIN || 'api-rc.taxicaller.net';
@@ -69,16 +82,17 @@ export async function GET(req: NextRequest) {
         console.log('[TC accounts raw]', JSON.stringify(data));
 
         // TaxiCaller RC: list of accounts is in data.list
-        const raw: any[] = Array.isArray((data as any).list)
-        ? (data as any).list
-        : Array.isArray((data as any).accounts)
-        ? (data as any).accounts
-        : Array.isArray(data as any)
-        ? (data as any)
+        const typedData = data as TCAccountsResponse | TCAccountRaw[];
+        const raw: TCAccountRaw[] = Array.isArray((typedData as TCAccountsResponse).list)
+        ? (typedData as TCAccountsResponse).list!
+        : Array.isArray((typedData as TCAccountsResponse).accounts)
+        ? (typedData as TCAccountsResponse).accounts!
+        : Array.isArray(typedData)
+        ? (typedData as TCAccountRaw[])
         : [];
 
         let accounts = raw
-        .map((acc: any) => ({
+        .map((acc: TCAccountRaw) => ({
             id: acc.id, // 574252, 574254, ...
             // cname = company name ("inko co.", "bambola tltd", "The Little, John")
             name:
@@ -99,17 +113,28 @@ export async function GET(req: NextRequest) {
         }
 
         return NextResponse.json({ success: true, accounts }, { status: 200 });
-    } catch (err: any) {
-        const status = err?.response?.status;
-        const detail = err?.response?.data || err?.message;
-        console.error('Account list error:', status, detail);
+    } catch (err: unknown) {
+        let status: number | undefined;
+        let errorMessage = 'Failed to load accounts';
+        if (axios.isAxiosError(err)) {
+            status = err.response?.status;
+            const data = err.response?.data;
+            if (typeof data === 'object' && data !== null && 'message' in data) {
+                errorMessage = String((data as { message: unknown }).message);
+            } else if (typeof data === 'string') {
+                errorMessage = data;
+            } else if (err.message) {
+                errorMessage = err.message;
+            }
+        } else if (err instanceof Error) {
+            errorMessage = err.message;
+        }
+        console.error('Account list error:', status, errorMessage);
 
         return NextResponse.json(
             {
                 success: false,
-                error:
-                (detail && (detail.message || String(detail))) ||
-                'Failed to load accounts',
+                error: errorMessage,
             },
             { status: 500 }
         );
