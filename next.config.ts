@@ -30,6 +30,9 @@ const nextConfig: NextConfig = {
   // Strict mode for better development
   reactStrictMode: true,
 
+  // Server-only packages (Node.js modules)
+  serverExternalPackages: ["pg", "bcryptjs"],
+
   // Experimental features
   experimental: {
     // Optimize package imports
