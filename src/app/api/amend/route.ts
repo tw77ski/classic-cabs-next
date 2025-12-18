@@ -48,7 +48,8 @@ const toTC = (lng: number, lat: number) => [
 ];
 
 interface AmendRequest {
-  job_id: string | number;
+  job_id?: string | number;  // Numeric job ID (shown in TaxiCaller dispatch)
+  order_id?: string;          // String order ID (required for API calls) - e.g. "66cc3c074e2208db"
   // New details (any can be updated)
   pickup?: { address: string; lat: number; lng: number };
   dropoff?: { address: string; lat: number; lng: number };
@@ -63,14 +64,30 @@ export async function POST(req: Request) {
   try {
     const body: AmendRequest = await req.json();
 
-    if (!body.job_id) {
+    // TaxiCaller API uses order_id (hex string like "66cc3c074e2208db") for cancel endpoint
+    // Per docs: POST /api/v1/booker/order/{order_id}/cancel
+    const orderId = body.order_id;
+    const jobId = body.job_id;
+
+    if (!orderId && !jobId) {
       return NextResponse.json(
-        { ok: false, error: "job_id is required" },
+        { ok: false, error: "order_id or job_id is required" },
         { status: 400 }
       );
     }
 
-    console.log("📝 Amendment request for job:", body.job_id);
+    // Check if we have a valid hex order_id
+    const isHexOrderId = orderId && /^[0-9a-f]+$/i.test(orderId);
+    
+    // Prefer order_id for API calls (hex string like "66cc3c074e2208db")
+    const apiOrderId = isHexOrderId ? orderId : (orderId || String(jobId));
+
+    console.log("📝 Amendment request for order:", apiOrderId, "(job_id:", jobId, ", isHex:", isHexOrderId, ")");
+    
+    // Warn if we don't have a proper hex order_id
+    if (!isHexOrderId) {
+      console.warn("⚠️ No hex order_id available - using job_id which may fail with TaxiCaller API");
+    }
 
     const jwt = await getJwt();
 
@@ -78,8 +95,8 @@ export async function POST(req: Request) {
     // STEP 1: Try direct update (PUT/PATCH) - TaxiCaller may support this
     // ==========================================================================
     
-    // Try PUT first
-    const updateUrl = `https://${TC_DOMAIN}/api/v1/booker/order/${body.job_id}`;
+    // Try PUT first - use order_id for API calls
+    const updateUrl = `https://${TC_DOMAIN}/api/v1/booker/order/${apiOrderId}`;
     console.log("🔄 Attempting direct update via PUT:", updateUrl);
 
     const updatePayload = buildUpdatePayload(body);
@@ -104,7 +121,8 @@ export async function POST(req: Request) {
         return NextResponse.json({
           ok: true,
           method: "direct_update",
-          job_id: body.job_id,
+          order_id: apiOrderId,
+          job_id: jobId,
           message: "Booking updated successfully",
           taxicaller: putData,
         });
@@ -134,7 +152,8 @@ export async function POST(req: Request) {
         return NextResponse.json({
           ok: true,
           method: "direct_update",
-          job_id: body.job_id,
+          order_id: apiOrderId,
+          job_id: jobId,
           message: "Booking updated successfully",
           taxicaller: patchData,
         });
@@ -145,12 +164,13 @@ export async function POST(req: Request) {
 
     // ==========================================================================
     // STEP 2: Fallback to Cancel & Rebook
+    // Per TaxiCaller API: POST /api/v1/booker/order/{order_id}/cancel
     // ==========================================================================
     
     console.log("⚠️ Direct update not supported, using Cancel & Rebook");
 
-    // First, cancel the existing booking
-    const cancelUrl = `https://${TC_DOMAIN}/api/v1/booker/order/${body.job_id}/cancel`;
+    // First, cancel the existing booking using order_id (not job_id)
+    const cancelUrl = `https://${TC_DOMAIN}/api/v1/booker/order/${apiOrderId}/cancel`;
     console.log("🚫 Cancelling original booking:", cancelUrl);
 
     const cancelRes = await fetch(cancelUrl, {
@@ -216,7 +236,8 @@ export async function POST(req: Request) {
           error: errorMsg, 
           step: "rebook",
           original_cancelled: true,
-          original_job_id: body.job_id,
+          original_order_id: apiOrderId,
+          original_job_id: jobId,
         },
         { status: 400 }
       );
@@ -235,13 +256,16 @@ export async function POST(req: Request) {
     const newJobId = bookData.meta?.job_id;
     const newOrderId = bookData.order?.order_id;
 
-    console.log("✅ Amendment complete! New job ID:", newJobId);
+    console.log("✅ Amendment complete! New job ID:", newJobId, "| New order ID:", newOrderId);
 
     return NextResponse.json({
       ok: true,
       method: "cancel_rebook",
-      original_job_id: body.job_id,
-      new_job_id: String(newJobId || newOrderId),
+      original_order_id: apiOrderId,
+      original_job_id: jobId,
+      new_order_id: newOrderId,
+      new_job_id: newJobId,
+      order_id: newOrderId,
       job_id: newJobId,
       message: "Booking amended successfully (cancelled and rebooked)",
       taxicaller: bookData,

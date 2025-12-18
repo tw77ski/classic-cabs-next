@@ -57,8 +57,9 @@ interface EstimateResponse {
 
 interface BookingResponse {
   success: boolean;
-  booking_id?: string;
-  return_booking_id?: string; // For return trip bookings
+  booking_id?: string;           // Primary ID - hex order_id for API operations
+  job_id?: number;               // Display ID - numeric job_id shown in TaxiCaller dispatch
+  return_booking_id?: string;    // For return trip bookings
   status?: string;
   message?: string;
   error?: string;
@@ -197,10 +198,13 @@ export async function createBooking(request: BookingRequest): Promise<BookingRes
 
     const data = await res.json();
     
-    // Map API response (ok, order_id) to BookingResponse (success, booking_id)
+    // Map API response to BookingResponse
+    // booking_id = hex order_id (needed for TaxiCaller API operations like cancel/amend)
+    // job_id = numeric ID shown in TaxiCaller dispatch
     return {
       success: data.ok === true,
-      booking_id: data.order_id || data.booking_id,
+      booking_id: data.order_id || data.booking_id,  // Hex order_id for API calls
+      job_id: data.job_id,  // Numeric job_id for display
       return_booking_id: data.return_order_id,
       status: data.ok ? "confirmed" : "failed",
       message: data.ok ? "Booking confirmed" : data.error,

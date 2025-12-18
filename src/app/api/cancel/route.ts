@@ -3,9 +3,10 @@ import type { CancelResponse } from "@/lib/taxicaller-types";
 
 // =============================================================================
 // TaxiCaller Booker API - Cancel Order
-// POST https://api-rc.taxicaller.net/api/v1/booker/order/{jobId}/cancel
+// POST https://api-rc.taxicaller.net/api/v1/booker/order/{order_id}/cancel
 //
-// The job_id is returned when creating a booking via the Booker API
+// IMPORTANT: The TaxiCaller cancel API requires the order_id (hex string like
+// "66cc3c074e2208db"), NOT the job_id (numeric like "5325418")
 // =============================================================================
 
 const isDev = process.env.NODE_ENV === "development";
@@ -21,17 +22,29 @@ export async function DELETE(req: NextRequest) {
     );
   }
 
-  // Accept both bookingId and job_id (Booker API returns job_id)
+  // Prioritize order_id (hex string) for API call, fall back to job_id
+  // The TaxiCaller cancel endpoint requires the order_id format (hex string like "66cc3c074e2208db")
+  const orderId = body.order_id || body.orderId || body.internal_order_id;
   const jobId = body.bookingId || body.booking_id || body.jobId || body.job_id;
   
-  if (!jobId) {
+  if (!orderId && !jobId) {
     return NextResponse.json<CancelResponse>(
-      { success: false, error: "Missing booking/job ID" },
+      { success: false, error: "Missing booking/order ID" },
       { status: 400 }
     );
   }
 
-  if (isDev) console.log("📋 Cancelling job:", jobId);
+  // Check if we have the correct order_id format
+  // TaxiCaller cancel API expects a hex string, not a numeric job_id
+  const isHexOrderId = orderId && /^[0-9a-f]+$/i.test(orderId);
+  const cancelId = isHexOrderId ? orderId : (orderId || jobId);
+  
+  if (isDev) console.log("📋 Cancelling booking:", cancelId, "(order_id:", orderId, ", job_id:", jobId, ", isHex:", isHexOrderId, ")");
+  
+  // Warn if we're using a numeric job_id instead of hex order_id
+  if (!isHexOrderId && jobId) {
+    console.warn("⚠️ Using numeric job_id for cancel - may fail. For reliable cancellation, use order_id from booking response.");
+  }
 
   const apiDomain = process.env.TAXICALLER_API_DOMAIN || "api-rc.taxicaller.net";
   const apiKey = process.env.TAXICALLER_API_KEY;
@@ -39,7 +52,8 @@ export async function DELETE(req: NextRequest) {
   const companyId = Number(process.env.TAXICALLER_COMPANY_ID) || 8284;
 
   // Use Booker API endpoint for cancellation
-  const url = `https://${apiDomain}/api/v1/booker/order/${jobId}/cancel`;
+  // Per TaxiCaller docs: POST /api/v1/booker/order/{order_id}/cancel
+  const url = `https://${apiDomain}/api/v1/booker/order/${cancelId}/cancel`;
 
   if (isDev) console.log("📡 URL:", url);
 
@@ -85,7 +99,7 @@ export async function DELETE(req: NextRequest) {
     } catch {
       // If no JSON but status is OK, consider it success
       if (response.ok) {
-        if (isDev) console.log("✅ Booking cancelled (no JSON response):", jobId);
+        if (isDev) console.log("✅ Booking cancelled (no JSON response):", cancelId);
         return NextResponse.json<CancelResponse>({
           success: true,
           message: "Booking cancelled successfully",
@@ -105,7 +119,7 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    if (isDev) console.log("✅ Booking cancelled:", jobId);
+    if (isDev) console.log("✅ Booking cancelled:", cancelId);
 
     return NextResponse.json<CancelResponse>({
       success: true,

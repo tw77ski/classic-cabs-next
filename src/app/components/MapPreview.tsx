@@ -456,7 +456,7 @@ export default function MapPreview({
       container: mapContainer.current,
       style: "mapbox://styles/mapbox/dark-v11",
       center: jerseyCenter.current,
-      zoom: 12,
+      zoom: 10.5, // Zoomed out to show full Jersey island
       attributionControl: false,
     });
 

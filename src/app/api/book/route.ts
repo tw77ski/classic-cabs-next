@@ -150,13 +150,14 @@ function buildRouteNodes({
     info: { all: safeNotes },
   });
 
-  // Intermediate stops
+  // Intermediate stops (via points - passenger stays in vehicle)
+  // Per TaxiCaller API docs: action "via" for intermediate stops
   for (const stop of stops) {
     if (!stop.address) continue;
     const p = normPoint(stop.address, stop.lat, stop.lng);
     nodes.push({
       seq: seq++,
-      actions: [{ "@type": "client_action", item_seq: 0, action: "out" }],
+      actions: [{ "@type": "client_action", item_seq: 0, action: "via" }],
       location: {
         name: p.name,
         coords: toTC(p.lng, p.lat),
@@ -354,18 +355,24 @@ export async function POST(req: Request) {
 
     console.log("✅ TaxiCaller booking success:", parsed);
 
-    // Extract the job_id from meta - this is the ID shown in TaxiCaller dispatch
+    // Extract IDs from response
+    // job_id = numeric ID shown in TaxiCaller dispatch (e.g. 5325418)
+    // order_id = hex string needed for API calls like cancel (e.g. "66cc3c074e2208db")
     const jobId = parsed.meta?.job_id;
     const orderId = parsed.order?.order_id;
     
     console.log("📋 Job ID:", jobId, "| Order ID:", orderId);
 
-    // Return success with job_id as the primary booking ID (matches TaxiCaller dispatch)
+    // Return hex order_id as the primary ID (needed for TaxiCaller API operations)
+    // Also include job_id for display (matches what users see in TaxiCaller dispatch)
     return NextResponse.json({
       ok: true,
-      order_id: String(jobId || orderId || parsed.id),
+      // Primary ID - use hex order_id for API operations (cancel/amend)
+      order_id: orderId || String(jobId || parsed.id),
+      // Display ID - numeric job_id shown in TaxiCaller dispatch
       job_id: jobId,
-      internal_order_id: orderId,
+      // Backwards compatibility
+      booking_id: orderId || String(jobId || parsed.id),
       status: "confirmed",
       taxicaller: parsed,
     });

@@ -28,7 +28,8 @@ interface EstimateResult {
 }
 
 interface BookingResult {
-  booking_id?: string;
+  booking_id?: string;           // Primary ID - hex order_id for API operations
+  job_id?: number;               // Display ID - numeric job_id shown in TaxiCaller dispatch
   status?: string;
   error?: string;
 }
@@ -438,7 +439,11 @@ export default function Page() {
       
       if (result.booking_id) {
         setBookingId(result.booking_id);
-        sessionStorage.setItem("booking_id", result.booking_id);
+        sessionStorage.setItem("booking_id", result.booking_id);  // Now stores hex order_id
+        // Also store job_id for display reference
+        if (result.job_id) {
+          sessionStorage.setItem("job_id", String(result.job_id));
+        }
         
         // Save passenger for future autofill
         if (passenger.name && passenger.phone) {
@@ -480,10 +485,13 @@ export default function Page() {
     setError(null);
 
     try {
+      // bookingId is now the hex order_id (correct format for TaxiCaller API)
       const res = await fetch("/api/cancel", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookingId }),
+        body: JSON.stringify({ 
+          order_id: bookingId,  // Hex order_id for TaxiCaller API
+        }),
       });
 
       const data = await res.json();
@@ -491,6 +499,7 @@ export default function Page() {
       if (data?.success || data?.status === "cancelled") {
         setBookingStatus("cancelled");
         sessionStorage.removeItem("booking_id");
+        sessionStorage.removeItem("job_id");
       } else {
         setError(data?.error || "Failed to cancel booking");
       }
@@ -538,6 +547,7 @@ export default function Page() {
         if (cancelBookingIdInput === bookingId) {
           setBookingStatus("cancelled");
           sessionStorage.removeItem("booking_id");
+          sessionStorage.removeItem("job_id");
         }
       } else {
         setStandaloneCancelResult({
@@ -587,8 +597,10 @@ export default function Page() {
     try {
       // For amendment, we need current pickup/dropoff - use form values if available
       // Otherwise, the API will need the full details
+      // 
+      // amendBookingId should now be the hex order_id (e.g. "66cc3c074e2208db")
       const amendPayload: Record<string, unknown> = {
-        job_id: amendBookingId.trim(),
+        order_id: amendBookingId.trim(),  // Hex order_id for TaxiCaller API
         pickup_time: new Date(amendPickupTime).toISOString(),
       };
 
@@ -684,9 +696,9 @@ export default function Page() {
       </header>
 
       {/* Main Content - Responsive Two-Column Layout */}
-      <div className="max-w-7xl mx-auto lg:flex lg:gap-6 px-4 py-4">
+      <div className="max-w-7xl mx-auto lg:flex lg:gap-8 px-4 py-4">
         {/* Left Column - Form */}
-        <div className="w-full lg:w-1/2 xl:w-[480px] lg:flex-shrink-0 space-y-3">
+        <div className="w-full lg:w-[420px] xl:w-[440px] lg:flex-shrink-0 space-y-3">
         
         {/* Error Message */}
         {error && (
@@ -1177,8 +1189,13 @@ export default function Page() {
                 <div className="bg-[#111] rounded-lg p-3 mb-3 group">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs text-[#888] mb-1">Booking ID</p>
-                      <p className="font-mono text-xl text-[#ffd55c] font-bold">{bookingResult.booking_id}</p>
+                      <p className="text-xs text-[#888] mb-1">Booking Reference</p>
+                      <p className="font-mono text-lg text-[#ffd55c] font-bold">{bookingResult.booking_id}</p>
+                      {bookingResult.job_id && (
+                        <p className="text-xs text-[#666] mt-1">
+                          Dispatch ID: <span className="font-mono">{bookingResult.job_id}</span>
+                        </p>
+                      )}
                     </div>
                     <button
                       onClick={() => {
@@ -1192,7 +1209,7 @@ export default function Page() {
                       }}
                       id="copy-btn-individual"
                       className="relative p-2 rounded-lg bg-[#222] hover:bg-[#333] border border-[#333] hover:border-[#ffd55c]/50 transition group/btn"
-                      title="Copy booking ID"
+                      title="Copy booking reference"
                     >
                       <svg className="w-5 h-5 text-[#888] group-hover/btn:text-[#ffd55c] transition [.copied_&]:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
@@ -1445,10 +1462,11 @@ export default function Page() {
           </footer>
         </div>
 
-        {/* Right Column - Sticky Map (Desktop Only) */}
-        <div className="hidden lg:block lg:flex-1 lg:min-w-0">
-          <div className="sticky top-20 h-[calc(100vh-6rem)]">
-            <div className="h-full rounded-xl overflow-hidden border border-[#333] bg-[#1b1b1b]">
+        {/* Right Column - Map (Desktop Only) */}
+        <div className="hidden lg:flex lg:flex-1 lg:min-w-0 lg:flex-col">
+          <div className="w-full">
+            {/* Map Container - full width, compact height */}
+            <div className="h-[280px] xl:h-[300px] rounded-xl overflow-hidden border border-[#333] bg-[#1b1b1b]">
               <MapPreview
                 pickup={pickupCoords}
                 stops={stopCoords}
