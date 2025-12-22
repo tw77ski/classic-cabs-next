@@ -1,0 +1,107 @@
+# ============================================
+# Classic Cabs - Docker Compose Configuration
+# ============================================
+# Usage:
+#   Production: docker-compose up -d
+#   With build: docker-compose up -d --build
+#   Logs:       docker-compose logs -f app
+#   Stop:       docker-compose down
+
+version: '3.8'
+
+services:
+  # ===================
+  # Next.js Application
+  # ===================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: classic-cabs-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # Database
+      - DATABASE_URL=${DATABASE_URL}
+      - POSTGRES_HOST=${POSTGRES_HOST:-db}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB:-classic_cabs}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      
+      # TaxiCaller API
+      - TC_API_KEY=${TC_API_KEY}
+      - TC_API_SECRET=${TC_API_SECRET}
+      - TC_COMPANY_ID=${TC_COMPANY_ID}
+      - TC_DOMAIN=${TC_DOMAIN}
+      
+      # Mapbox
+      - NEXT_PUBLIC_MAPBOX_TOKEN=${NEXT_PUBLIC_MAPBOX_TOKEN}
+      
+      # App Config
+      - NODE_ENV=production
+      - NEXT_TELEMETRY_DISABLED=1
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - classic-cabs-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/taxicaller-health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ===================
+  # PostgreSQL Database
+  # ===================
+  db:
+    image: postgres:16-alpine
+    container_name: classic-cabs-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-classic_cabs}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/corporate-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - classic-cabs-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-classic_cabs}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ===================
+  # Nginx Reverse Proxy (Optional - for SSL)
+  # ===================
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: classic-cabs-nginx
+  #   restart: unless-stopped
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx.conf:/etc/nginx/nginx.conf:ro
+  #     - ./certs:/etc/nginx/certs:ro
+  #   depends_on:
+  #     - app
+  #   networks:
+  #     - classic-cabs-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  classic-cabs-network:
+    driver: bridge
+
