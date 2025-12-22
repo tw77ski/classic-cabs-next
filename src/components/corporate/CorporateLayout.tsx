@@ -13,27 +13,37 @@ interface CorporateLayoutProps {
 }
 
 export default function CorporateLayout({ children }: CorporateLayoutProps) {
+  const pathname = usePathname();
+  
+  // IMPORTANT: Check if login page FIRST, before any hooks that might cause re-renders
+  const isLoginPage = pathname?.includes("/login");
+
+  // For login page, render children immediately without any session logic
+  if (isLoginPage) {
+    return <>{children}</>;
+  }
+
+  // For all other pages, use the authenticated layout
+  return <AuthenticatedLayout>{children}</AuthenticatedLayout>;
+}
+
+// Separate component for authenticated pages
+function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { data: session, status } = useSession();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  const isLoginPage = pathname.includes("/login");
   const isLoading = status === "loading";
   const isAuthenticated = status === "authenticated" && session?.user;
 
-  // Handle redirects
+  // Handle redirect if not authenticated
   useEffect(() => {
-    if (status === "loading") return; // Wait for session to load
-
-    if (!isAuthenticated && !isLoginPage) {
-      // Not authenticated and not on login page -> redirect to login
+    if (status === "loading") return;
+    if (!isAuthenticated) {
       router.push("/corporate/login");
-    } else if (isAuthenticated && isLoginPage) {
-      // Authenticated but on login page -> redirect to dashboard
-      router.push("/corporate/dashboard");
     }
-  }, [status, isAuthenticated, isLoginPage, router]);
+  }, [status, isAuthenticated, router]);
 
   // Handle logout
   async function handleLogout() {
@@ -45,24 +55,7 @@ export default function CorporateLayout({ children }: CorporateLayoutProps) {
     }
   }
 
-  // Login page - render immediately without loading state
-  if (isLoginPage) {
-    // If authenticated, show loading while redirecting
-    if (isAuthenticated) {
-      return (
-        <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#0d0f0e" }}>
-          <div className="flex flex-col items-center gap-4">
-            <div className="w-10 h-10 border-3 border-[#ffd55c]/30 border-t-[#ffd55c] rounded-full animate-spin" />
-            <p className="text-[#888] text-sm">Redirecting...</p>
-          </div>
-        </div>
-      );
-    }
-    // Not authenticated - show login page
-    return <>{children}</>;
-  }
-
-  // Other pages - show loading while checking session
+  // Show loading while checking session
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#0d0f0e" }}>
@@ -76,7 +69,14 @@ export default function CorporateLayout({ children }: CorporateLayoutProps) {
 
   // Not authenticated - show nothing (redirect will happen)
   if (!isAuthenticated || !session?.user) {
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#0d0f0e" }}>
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-3 border-[#ffd55c]/30 border-t-[#ffd55c] rounded-full animate-spin" />
+          <p className="text-[#888] text-sm">Redirecting...</p>
+        </div>
+      </div>
+    );
   }
 
   // Build user and company from session
@@ -115,7 +115,7 @@ export default function CorporateLayout({ children }: CorporateLayoutProps) {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-lg font-semibold text-[#f5f5f5] capitalize">
-                {pathname.split("/").pop()?.replace(/-/g, " ") || "Dashboard"}
+                {pathname?.split("/").pop()?.replace(/-/g, " ") || "Dashboard"}
               </h1>
               <p className="text-xs text-[#666]">{company.name}</p>
             </div>
