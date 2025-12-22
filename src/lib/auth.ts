@@ -166,12 +166,3 @@ declare module "next-auth" {
   }
 }
 
-declare module "next-auth/jwt" {
-  interface JWT {
-    role?: string;
-    companyId?: string;
-    companyName?: string;
-    taxiCallerAccountId?: number;
-  }
-}
-
