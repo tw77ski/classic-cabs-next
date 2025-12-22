@@ -4,29 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 // Extend global for logging throttle
 declare global {
-  // eslint-disable-next-line no-var
   var lastHistoryLog: number | undefined;
-}
-
-// Raw job structure from TaxiCaller API
-interface TCRawJob {
-    id?: string | number;
-    job_id?: string | number;
-    order_id?: string | number;
-    ref?: string;
-    reference?: string;
-    status?: string;
-    pickup_time?: number | string;
-    created_at?: string;
-    from?: { name?: string };
-    to?: { name?: string };
-    pickup?: { name?: string };
-    dropoff?: { name?: string };
-    pickup_address?: string;
-    dropoff_address?: string;
-    price_total?: number;
-    fare?: number;
-    total?: number;
 }
 
 // Mapped job structure

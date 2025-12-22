@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 
 // Extend global for logging throttle
 declare global {
-  // eslint-disable-next-line no-var
   var lastVehicleLog: number | undefined;
 }
 

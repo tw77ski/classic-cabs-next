@@ -5,6 +5,30 @@
 @import 'mapbox-gl/dist/mapbox-gl.css';
 
 @import "tailwindcss";
+@plugin "@tailwindcss/forms";
+
+/* ============================================
+   TAILWIND THEME CUSTOMIZATION
+   ============================================ */
+@theme {
+  /* Slightly larger font sizes for better readability */
+  --font-size-xs: 12px;
+  --font-size-xs--line-height: 16px;
+  --font-size-sm: 13px;
+  --font-size-sm--line-height: 18px;
+  --font-size-base: 14px;
+  --font-size-base--line-height: 20px;
+  --font-size-lg: 16px;
+  --font-size-lg--line-height: 22px;
+
+  /* Semantic color tokens */
+  --color-background: #0b0b0b;
+  --color-surface: #121212;
+  --color-border: #1f1f1f;
+  --color-muted: #9ca3af;
+  --color-gold: #f5c451;
+  --color-gold-dark: #c9a227;
+}
 
 /* ============================================
    THEME CSS VARIABLES - Dark/Light Mode
