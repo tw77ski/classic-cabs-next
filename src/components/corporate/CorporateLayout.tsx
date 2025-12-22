@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { signOut } from "next-auth/react";
 import CorporateSidebar from "./CorporateSidebar";
 
 interface SessionUser {
@@ -72,7 +73,7 @@ export default function CorporateLayout({ children }: CorporateLayoutProps) {
   // Handle logout
   async function handleLogout() {
     try {
-      await fetch("/api/corporate/auth/logout", { method: "POST" });
+      await signOut({ redirect: false });
       setUser(null);
       setCompany(null);
       router.push("/corporate/login");
@@ -169,6 +170,7 @@ export default function CorporateLayout({ children }: CorporateLayoutProps) {
     </div>
   );
 }
+
 
 
 

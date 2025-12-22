@@ -1,31 +1,16 @@
-// Corporate Logout API
-// POST /api/corporate/auth/logout
-
-import { NextResponse } from 'next/server';
-import { clearSession } from '@/lib/corporate/auth';
+// Corporate Logout API - Now uses Auth.js
+import { NextResponse } from "next/server";
+import { signOut } from "@/lib/auth";
 
 export async function POST() {
   try {
-    await clearSession();
+    // Sign out using Auth.js
+    await signOut({ redirect: false });
     
-    console.log('[Corporate Auth] Logout successful');
-
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('[Corporate Auth] Logout error:', error);
-    return NextResponse.json(
-      { success: false, error: 'Logout failed' },
-      { status: 500 }
-    );
+    console.error("[Logout API] Error:", error);
+    // Even if there's an error, return success as we want the user logged out
+    return NextResponse.json({ success: true });
   }
 }
-
-
-
-
-
-
-
-
-
-

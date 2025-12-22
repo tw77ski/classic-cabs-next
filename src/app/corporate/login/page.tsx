@@ -1,48 +1,22 @@
-// Corporate Login Page
+// Corporate Login Page with Auth.js
 // /corporate/login
 
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { signIn } from "next-auth/react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-
-interface DemoUser {
-  email: string;
-  company: string;
-  role: string;
-}
 
 export default function CorporateLoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
-  // Demo mode state
-  const [authMode, setAuthMode] = useState<'loading' | 'database' | 'demo'>('loading');
-  const [demoUsers, setDemoUsers] = useState<DemoUser[]>([]);
 
-  // Check auth mode on mount
-  useEffect(() => {
-    async function checkAuthStatus() {
-      try {
-        const res = await fetch('/api/corporate/auth/status');
-        const data = await res.json();
-        
-        if (data.success) {
-          setAuthMode(data.mode);
-          setDemoUsers(data.demoUsers || []);
-        }
-      } catch {
-        // Default to demo mode on error
-        setAuthMode('demo');
-      }
-    }
-    
-    checkAuthStatus();
-  }, []);
+  const callbackUrl = searchParams.get("callbackUrl") || "/corporate/dashboard";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -50,21 +24,20 @@ export default function CorporateLoginPage() {
     setIsLoading(true);
 
     try {
-      const res = await fetch("/api/corporate/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
       });
 
-      const data = await res.json();
-
-      if (!res.ok || !data.success) {
-        setError(data.error || "Login failed. Please check your credentials.");
+      if (result?.error) {
+        setError("Invalid email or password");
         return;
       }
 
-      // Redirect to dashboard on success
-      router.push("/corporate/dashboard");
+      // Redirect on success
+      router.push(callbackUrl);
+      router.refresh();
     } catch (err) {
       console.error("Login error:", err);
       setError("An error occurred. Please try again.");
@@ -72,6 +45,12 @@ export default function CorporateLoginPage() {
       setIsLoading(false);
     }
   }
+
+  // Demo users for quick login
+  const demoUsers = [
+    { email: "admin@democompany.je", company: "Demo Company Ltd", role: "admin" },
+    { email: "booker@democompany.je", company: "Demo Company Ltd", role: "booker" },
+  ];
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: "#0d0f0e" }}>
@@ -160,56 +139,44 @@ export default function CorporateLoginPage() {
           </div>
         </div>
 
-        {/* Demo Hints - Only shown when NOT using database */}
-        {authMode === 'demo' && demoUsers.length > 0 && (
-          <div className="mt-6 bg-[#1b1b1b]/50 border border-[#333]/50 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <svg className="w-4 h-4 text-[#ffd55c]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M12 16v-4M12 8h.01" />
-              </svg>
-              <p className="text-xs font-medium text-[#888]">Demo Accounts</p>
-            </div>
-            
-            <div className="space-y-2">
-              {demoUsers.map((demo) => (
-                <button
-                  key={demo.email}
-                  type="button"
-                  onClick={() => {
-                    setEmail(demo.email);
-                    setPassword("demo123");
-                  }}
-                  className="w-full text-left px-3 py-2 bg-[#111]/50 border border-[#222] rounded-lg hover:border-[#ffd55c]/30 hover:bg-[#ffd55c]/5 transition group"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-[#ccc] group-hover:text-[#f5f5f5] font-mono">{demo.email}</p>
-                      <p className="text-[10px] text-[#666]">{demo.company} • {demo.role}</p>
-                    </div>
-                    <svg className="w-3 h-3 text-[#555] group-hover:text-[#ffd55c] transition" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M5 12h14M12 5l7 7-7 7" />
-                    </svg>
+        {/* Demo Hints */}
+        <div className="mt-6 bg-[#1b1b1b]/50 border border-[#333]/50 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <svg className="w-4 h-4 text-[#ffd55c]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 16v-4M12 8h.01" />
+            </svg>
+            <p className="text-xs font-medium text-[#888]">Demo Accounts</p>
+          </div>
+          
+          <div className="space-y-2">
+            {demoUsers.map((demo) => (
+              <button
+                key={demo.email}
+                type="button"
+                onClick={() => {
+                  setEmail(demo.email);
+                  setPassword("demo123");
+                }}
+                className="w-full text-left px-3 py-2 bg-[#111]/50 border border-[#222] rounded-lg hover:border-[#ffd55c]/30 hover:bg-[#ffd55c]/5 transition group"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-[#ccc] group-hover:text-[#f5f5f5] font-mono">{demo.email}</p>
+                    <p className="text-[10px] text-[#666]">{demo.company} • {demo.role}</p>
                   </div>
-                </button>
-              ))}
-            </div>
-            
-            <p className="text-[10px] text-[#555] mt-3 text-center">
-              Password for all: <span className="font-mono text-[#888]">demo123</span>
-            </p>
+                  <svg className="w-3 h-3 text-[#555] group-hover:text-[#ffd55c] transition" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M5 12h14M12 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </button>
+            ))}
           </div>
-        )}
-
-        {/* Database mode indicator */}
-        {authMode === 'database' && (
-          <div className="mt-6 text-center">
-            <div className="inline-flex items-center gap-2 px-3 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
-              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-              <p className="text-xs text-emerald-400">Connected to secure database</p>
-            </div>
-          </div>
-        )}
+          
+          <p className="text-[10px] text-[#555] mt-3 text-center">
+            Password for all: <span className="font-mono text-[#888]">demo123</span>
+          </p>
+        </div>
 
         {/* Back to main site */}
         <div className="mt-6 text-center">
