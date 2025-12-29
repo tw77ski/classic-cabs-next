@@ -1,65 +1,30 @@
-// Corporate Login API
-// POST /api/corporate/auth/login
+// Corporate Login API - Deprecated
+// Login now handled by Auth.js at /api/auth/callback/credentials
+// This endpoint exists for backwards compatibility
 
-import { NextRequest, NextResponse } from 'next/server';
-import { validateCredentials, createSessionCookie } from '@/lib/corporate/auth';
+import { NextRequest, NextResponse } from "next/server";
 
-export async function POST(req: NextRequest) {
+export async function POST(request: NextRequest) {
+  // Debug: Log where this request is coming from
+  const referer = request.headers.get("referer") || "unknown";
+  const userAgent = request.headers.get("user-agent") || "unknown";
+  
+  console.log("⚠️ [DEPRECATED] /api/corporate/auth/login called!");
+  console.log("   Referer:", referer);
+  console.log("   User-Agent:", userAgent.substring(0, 50));
+  
   try {
-    const body = await req.json();
-    const { email, password } = body;
-
-    if (!email || !password) {
-      return NextResponse.json(
-        { success: false, error: 'Email and password are required' },
-        { status: 400 }
-      );
-    }
-
-    // Validate credentials
-    const session = await validateCredentials(email, password);
-
-    if (!session) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid email or password' },
-        { status: 401 }
-      );
-    }
-
-    // Create session cookie
-    await createSessionCookie(session);
-
-    console.log(`[Corporate Auth] Login successful: ${email} (${session.company.name})`);
-
-    return NextResponse.json({
-      success: true,
-      user: {
-        id: session.user.id,
-        email: session.user.email,
-        name: session.user.name,
-        role: session.user.role,
-      },
-      company: {
-        id: session.company.id,
-        name: session.company.name,
-      },
-    });
-  } catch (error) {
-    console.error('[Corporate Auth] Login error:', error);
-    return NextResponse.json(
-      { success: false, error: 'Login failed' },
-      { status: 500 }
-    );
+    const body = await request.json();
+    console.log("   Body keys:", Object.keys(body));
+  } catch {
+    console.log("   Body: (not JSON)");
   }
+
+  return NextResponse.json(
+    { 
+      success: false, 
+      error: "Please use the login page. Direct API login is deprecated." 
+    },
+    { status: 400 }
+  );
 }
-
-
-
-
-
-
-
-
-
-
-

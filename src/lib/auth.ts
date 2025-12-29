@@ -1,32 +1,10 @@
-// Auth.js Configuration for Corporate Portal
+// Auth.js Main Configuration
+// Uses JWT strategy (no database sessions) for Edge compatibility
+
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
-import { query, isDatabaseAvailable, areCorporateTablesReady } from "./corporate/db";
-
-// Demo users for development/fallback
-const DEMO_USERS = [
-  {
-    id: "demo-1",
-    email: "admin@democompany.je",
-    password: "demo123",
-    name: "Demo Admin",
-    role: "admin",
-    companyId: "1",
-    companyName: "Demo Company Ltd",
-    taxiCallerAccountId: 574252,
-  },
-  {
-    id: "demo-2",
-    email: "booker@democompany.je",
-    password: "demo123",
-    name: "Demo Booker",
-    role: "booker",
-    companyId: "1",
-    companyName: "Demo Company Ltd",
-    taxiCallerAccountId: 574252,
-  },
-];
+import { prisma } from "./prisma";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -37,102 +15,80 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
+        console.log("🔐 [Auth] authorize() called");
+        console.log("🔐 [Auth] credentials:", credentials?.email);
+        
         if (!credentials?.email || !credentials?.password) {
+          console.log("🔐 [Auth] Missing credentials");
           return null;
         }
 
         const email = (credentials.email as string).toLowerCase().trim();
         const password = credentials.password as string;
 
-        // Try database first
+        console.log("🔐 [Auth] Looking up user:", email);
+
         try {
-          const dbAvailable = await isDatabaseAvailable();
-          const tablesReady = dbAvailable && await areCorporateTablesReady();
+          // Find user in database
+          const user = await prisma.user.findUnique({
+            where: { email },
+          });
+          console.log("🔐 [Auth] User found:", !!user);
 
-          if (tablesReady) {
-            const result = await query<{
-              id: number;
-              email: string;
-              password_hash: string;
-              name: string;
-              role: string;
-              company_id: number;
-              company_name: string;
-              taxicaller_account_id: number;
-            }>(`
-              SELECT 
-                u.id, u.email, u.password_hash, u.name, u.role, u.company_id,
-                c.name as company_name, c.taxicaller_account_id
-              FROM corporate_users u
-              JOIN corporate_companies c ON u.company_id = c.id
-              WHERE LOWER(u.email) = LOWER($1) AND u.active = true AND c.active = true
-            `, [email]);
-
-            if (result.rows.length > 0) {
-              const user = result.rows[0];
-              const isValid = await bcrypt.compare(password, user.password_hash);
-              
-              if (isValid) {
-                // Update last login
-                await query(`UPDATE corporate_users SET last_login = NOW() WHERE id = $1`, [user.id]);
-                
-                console.log(`[Auth.js] DB login successful: ${email}`);
-                return {
-                  id: String(user.id),
-                  email: user.email,
-                  name: user.name,
-                  role: user.role,
-                  companyId: String(user.company_id),
-                  companyName: user.company_name,
-                  taxiCallerAccountId: user.taxicaller_account_id,
-                };
-              }
-            }
+          if (!user || !user.password) {
+            console.log(`🔐 [Auth] User not found or no password: ${email}`);
+            return null;
           }
-        } catch (error) {
-          console.error("[Auth.js] Database error:", error);
-        }
+          console.log("🔐 [Auth] Comparing password...");
 
-        // Fallback to demo users
-        const demoUser = DEMO_USERS.find(
-          (u) => u.email === email && u.password === password
-        );
+          // Verify password
+          const isValid = await bcrypt.compare(password, user.password);
+          if (!isValid) {
+            console.log(`[Auth] Invalid password for: ${email}`);
+            return null;
+          }
 
-        if (demoUser) {
-          console.log(`[Auth.js] Demo login: ${email}`);
+          // Update last login
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { lastLoginAt: new Date() },
+          });
+
+          console.log(`[Auth] Login successful: ${email}`);
+
           return {
-            id: demoUser.id,
-            email: demoUser.email,
-            name: demoUser.name,
-            role: demoUser.role,
-            companyId: demoUser.companyId,
-            companyName: demoUser.companyName,
-            taxiCallerAccountId: demoUser.taxiCallerAccountId,
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            taxiCallerCompanyId: user.taxiCallerCompanyId,
+            taxiCallerRoles: user.taxiCallerRoles,
           };
+        } catch (error) {
+          console.error("[Auth] Database error:", error);
+          return null;
         }
-
-        console.log(`[Auth.js] Login failed: ${email}`);
-        return null;
       },
     }),
   ],
   callbacks: {
     async jwt({ token, user }) {
+      // Initial sign in - add user data to token
       if (user) {
-        token.role = user.role;
-        token.companyId = user.companyId;
-        token.companyName = user.companyName;
-        token.taxiCallerAccountId = user.taxiCallerAccountId;
+        token.id = user.id;
+        token.role = (user as any).role;
+        token.taxiCallerCompanyId = (user as any).taxiCallerCompanyId;
+        token.taxiCallerRoles = (user as any).taxiCallerRoles;
       }
       return token;
     },
     async session({ session, token }) {
+      // Add token data to session
       if (session.user) {
-        session.user.id = token.sub as string;
-        session.user.role = token.role as string;
-        session.user.companyId = token.companyId as string;
-        session.user.companyName = token.companyName as string;
-        session.user.taxiCallerAccountId = token.taxiCallerAccountId as number;
+        session.user.id = token.id as string;
+        (session.user as any).role = token.role;
+        (session.user as any).taxiCallerCompanyId = token.taxiCallerCompanyId;
+        (session.user as any).taxiCallerRoles = token.taxiCallerRoles;
       }
       return session;
     },
@@ -147,22 +103,52 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   trustHost: true,
 });
 
-// Type augmentation for session
+// =============================================================================
+// Type Augmentation for Auth.js
+// =============================================================================
+
 declare module "next-auth" {
   interface User {
     role?: string;
-    companyId?: string;
-    companyName?: string;
-    taxiCallerAccountId?: number;
+    taxiCallerCompanyId?: number;
+    taxiCallerRoles?: string[];
   }
   interface Session {
-    user: User & {
+    user: {
       id: string;
+      email: string;
+      name: string;
       role: string;
-      companyId: string;
-      companyName: string;
-      taxiCallerAccountId: number;
+      taxiCallerCompanyId: number;
+      taxiCallerRoles: string[];
     };
   }
 }
 
+// =============================================================================
+// Helper Functions
+// =============================================================================
+
+/**
+ * Get current session (server-side)
+ */
+export async function getServerSession() {
+  return await auth();
+}
+
+/**
+ * Check if user is admin
+ */
+export function isAdmin(session: { user: { role: string } } | null): boolean {
+  return session?.user?.role === "ADMIN";
+}
+
+/**
+ * Check if user belongs to a specific TaxiCaller company
+ */
+export function belongsToCompany(
+  session: { user: { taxiCallerCompanyId: number } } | null,
+  companyId: number
+): boolean {
+  return session?.user?.taxiCallerCompanyId === companyId;
+}

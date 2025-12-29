@@ -84,13 +84,13 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
     id: session.user.id || "",
     name: session.user.name || "",
     email: session.user.email || "",
-    role: session.user.role || "booker",
+    role: (session.user as any).role || "USER",
   };
 
   const company = {
-    id: session.user.companyId || "",
-    name: session.user.companyName || "",
-    taxiCallerAccountId: session.user.taxiCallerAccountId || 0,
+    id: String((session.user as any).taxiCallerCompanyId || ""),
+    name: "Classic Cabs Jersey", // We could fetch this from DB if needed
+    taxiCallerAccountId: (session.user as any).taxiCallerCompanyId || 0,
   };
 
   // Authenticated pages - show sidebar

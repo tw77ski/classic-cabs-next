@@ -3,7 +3,7 @@
 // Returns real stats and bookings from TaxiCaller for the logged-in company
 
 import { NextResponse } from 'next/server';
-import { getSession } from '@/lib/corporate/auth';
+import { auth } from '@/lib/auth';
 
 const TC_DOMAIN = process.env.TAXICALLER_API_DOMAIN || 'api-rc.taxicaller.net';
 const TC_COMPANY_ID = Number(process.env.TAXICALLER_COMPANY_ID) || 8284;
@@ -122,17 +122,17 @@ function formatRelativeTime(dateStr: string): string {
 
 export async function GET() {
   try {
-    // Get session to get company's TaxiCaller account ID
-    const session = await getSession();
+    // Get Auth.js session
+    const session = await auth();
     
-    if (!session) {
+    if (!session?.user) {
       return NextResponse.json(
         { success: false, error: 'Not authenticated' },
         { status: 401 }
       );
     }
 
-    const accountId = session.company.taxiCallerAccountId;
+    const accountId = (session.user as any).taxiCallerCompanyId || TC_COMPANY_ID;
     
     // Calculate date ranges
     const now = new Date();
@@ -192,7 +192,7 @@ export async function GET() {
       recentBookings,
       upcomingBookings,
       company: {
-        name: session.company.name,
+        name: session.user.name || 'Corporate',
         accountId,
       },
     });
@@ -212,6 +212,8 @@ export async function GET() {
     });
   }
 }
+
+
 
 
 

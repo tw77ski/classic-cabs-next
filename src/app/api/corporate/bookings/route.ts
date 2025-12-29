@@ -1,26 +1,13 @@
 // Corporate Bookings API - Create pending bookings and list bookings
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { auth } from '@/lib/auth';
 import { createPendingBooking, getCompanyBookings, type BookingStatus } from '@/lib/corporate/bookings';
-
-// Get corporate session from cookie
-async function getSessionFromCookie() {
-  const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get('corporate_session');
-  if (!sessionCookie?.value) return null;
-  
-  try {
-    return JSON.parse(decodeURIComponent(sessionCookie.value));
-  } catch {
-    return null;
-  }
-}
 
 // POST - Create a new pending booking
 export async function POST(req: NextRequest) {
   try {
-    const session = await getSessionFromCookie();
-    if (!session) {
+    const session = await auth();
+    if (!session?.user) {
       return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 });
     }
     
@@ -35,9 +22,10 @@ export async function POST(req: NextRequest) {
     }
     
     // Create pending booking (NOT dispatched to TaxiCaller yet)
+    // Note: userId expects number (legacy schema), but Auth.js uses string IDs
     const booking = await createPendingBooking({
-      companyId: Number(session.company.id),
-      userId: Number(session.user.id),
+      companyId: (session.user as any).taxiCallerCompanyId || 0,
+      userId: 0, // Legacy field - actual user tracked via session
       passengerName: body.passengerName,
       passengerPhone: body.passengerPhone,
       passengerEmail: body.passengerEmail,
@@ -87,8 +75,8 @@ export async function POST(req: NextRequest) {
 // GET - List bookings for the company
 export async function GET(req: NextRequest) {
   try {
-    const session = await getSessionFromCookie();
-    if (!session) {
+    const session = await auth();
+    if (!session?.user) {
       return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 });
     }
     
@@ -96,8 +84,9 @@ export async function GET(req: NextRequest) {
     const status = searchParams.get('status') as BookingStatus | null;
     const limit = searchParams.get('limit') ? Number(searchParams.get('limit')) : undefined;
     
+    const companyId = (session.user as any).taxiCallerCompanyId || 0;
     const bookings = await getCompanyBookings(
-      Number(session.company.id),
+      companyId,
       { status: status || undefined, limit }
     );
     
@@ -115,6 +104,8 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
+
 
 
 

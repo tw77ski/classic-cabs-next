@@ -1,6 +1,7 @@
-// Corporate Session API - Now uses Auth.js
+// Corporate Session API - Uses Auth.js session
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   try {
@@ -14,18 +15,31 @@ export async function GET() {
       });
     }
 
+    // Get company info from database
+    const companyId = (session.user as any).taxiCallerCompanyId;
+    let companyName = "Classic Cabs Jersey";
+    
+    if (companyId) {
+      const company = await prisma.taxiCallerCompany.findUnique({
+        where: { id: companyId },
+      });
+      if (company) {
+        companyName = company.name;
+      }
+    }
+
     return NextResponse.json({
       authenticated: true,
       user: {
         id: session.user.id,
         email: session.user.email,
         name: session.user.name,
-        role: session.user.role,
+        role: (session.user as any).role || "USER",
       },
       company: {
-        id: session.user.companyId,
-        name: session.user.companyName,
-        taxiCallerAccountId: session.user.taxiCallerAccountId,
+        id: String(companyId || ""),
+        name: companyName,
+        taxiCallerAccountId: companyId || 0,
       },
     });
   } catch (error) {

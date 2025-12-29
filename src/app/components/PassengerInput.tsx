@@ -194,7 +194,7 @@ export default function PassengerInput({
           </label>
           <input
             type="email"
-            placeholder="passenger@email.com"
+            placeholder="email@example.com"
             value={email}
             onChange={(e) => onEmailChange(e.target.value)}
             className="w-full px-3 py-2 text-sm bg-[#111] border border-[#333] rounded-lg text-[#f5f5f5] placeholder-[#555] focus:outline-none focus:border-[#ffd55c]/50"

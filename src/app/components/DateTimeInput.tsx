@@ -160,7 +160,7 @@ export default function DateTimeInput({
         </label>
       )}
       <div className="flex gap-2">
-        {/* Date Input */}
+        {/* Date Input - with accessibility attributes (PHASE 2) */}
         <div className="flex-1">
           <input
             type="text"
@@ -168,11 +168,14 @@ export default function DateTimeInput({
             onChange={handleDateChange}
             placeholder="DD/MM/YYYY"
             maxLength={10}
+            inputMode="numeric"
+            autoComplete="off"
+            aria-label={label ? `${label} date in format day month year` : "Date in format day month year"}
             className={`${inputClass} w-full font-mono`}
           />
         </div>
         
-        {/* Time Input */}
+        {/* Time Input - with accessibility attributes (PHASE 2) */}
         <div className="w-24">
           <input
             type="text"
@@ -180,6 +183,9 @@ export default function DateTimeInput({
             onChange={handleTimeChange}
             placeholder="HH:MM"
             maxLength={5}
+            inputMode="numeric"
+            autoComplete="off"
+            aria-label={label ? `${label} time in format hours minutes` : "Time in format hours minutes"}
             className={`${inputClass} w-full font-mono text-center`}
           />
         </div>

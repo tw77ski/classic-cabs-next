@@ -1,14 +1,14 @@
-// Corporate Login Page with Auth.js
+// Corporate Login Page
 // /corporate/login
 
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
-export default function CorporateLoginPage() {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
@@ -25,7 +25,7 @@ export default function CorporateLoginPage() {
 
     try {
       const result = await signIn("credentials", {
-        email,
+        email: email.toLowerCase().trim(),
         password,
         redirect: false,
       });
@@ -45,12 +45,6 @@ export default function CorporateLoginPage() {
       setIsLoading(false);
     }
   }
-
-  // Demo users for quick login
-  const demoUsers = [
-    { email: "admin@democompany.je", company: "Demo Company Ltd", role: "admin" },
-    { email: "booker@democompany.je", company: "Demo Company Ltd", role: "booker" },
-  ];
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: "#0d0f0e" }}>
@@ -96,6 +90,7 @@ export default function CorporateLoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                autoComplete="email"
                 className="w-full px-4 py-3 text-sm bg-[#111] border border-[#333] rounded-lg text-[#f5f5f5] placeholder-[#555] focus:outline-none focus:border-[#ffd55c]/50"
                 placeholder="you@company.com"
               />
@@ -108,6 +103,7 @@ export default function CorporateLoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                autoComplete="current-password"
                 className="w-full px-4 py-3 text-sm bg-[#111] border border-[#333] rounded-lg text-[#f5f5f5] placeholder-[#555] focus:outline-none focus:border-[#ffd55c]/50"
                 placeholder="••••••••"
               />
@@ -139,44 +135,25 @@ export default function CorporateLoginPage() {
           </div>
         </div>
 
-        {/* Demo Hints */}
-        <div className="mt-6 bg-[#1b1b1b]/50 border border-[#333]/50 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <svg className="w-4 h-4 text-[#ffd55c]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M12 16v-4M12 8h.01" />
-            </svg>
-            <p className="text-xs font-medium text-[#888]">Demo Accounts</p>
+        {/* Dev mode demo hint */}
+        {process.env.NODE_ENV === "development" && (
+          <div className="mt-6 bg-[#1b1b1b]/50 border border-[#333]/50 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <svg className="w-4 h-4 text-[#ffd55c]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 16v-4M12 8h.01" />
+              </svg>
+              <p className="text-xs font-medium text-[#888]">Development Mode</p>
+            </div>
+            <p className="text-[10px] text-[#555]">
+              Run <code className="bg-[#111] px-1 rounded">npm run db:seed</code> to create demo users
+            </p>
+            <div className="mt-2 space-y-1 text-[10px] text-[#666]">
+              <p>Admin: admin@classiccabs.je / admin123</p>
+              <p>User: booker@classiccabs.je / user123</p>
+            </div>
           </div>
-          
-          <div className="space-y-2">
-            {demoUsers.map((demo) => (
-              <button
-                key={demo.email}
-                type="button"
-                onClick={() => {
-                  setEmail(demo.email);
-                  setPassword("demo123");
-                }}
-                className="w-full text-left px-3 py-2 bg-[#111]/50 border border-[#222] rounded-lg hover:border-[#ffd55c]/30 hover:bg-[#ffd55c]/5 transition group"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-[#ccc] group-hover:text-[#f5f5f5] font-mono">{demo.email}</p>
-                    <p className="text-[10px] text-[#666]">{demo.company} • {demo.role}</p>
-                  </div>
-                  <svg className="w-3 h-3 text-[#555] group-hover:text-[#ffd55c] transition" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M5 12h14M12 5l7 7-7 7" />
-                  </svg>
-                </div>
-              </button>
-            ))}
-          </div>
-          
-          <p className="text-[10px] text-[#555] mt-3 text-center">
-            Password for all: <span className="font-mono text-[#888]">demo123</span>
-          </p>
-        </div>
+        )}
 
         {/* Back to main site */}
         <div className="mt-6 text-center">
@@ -186,5 +163,17 @@ export default function CorporateLoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CorporateLoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#0d0f0e" }}>
+        <div className="w-10 h-10 border-3 border-[#ffd55c]/30 border-t-[#ffd55c] rounded-full animate-spin" />
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 }

@@ -66,6 +66,76 @@ interface BookingFormProps {
 
 const PENDING_BOOK_API = "/api/corporate/bookings";
 
+// === VALIDATION HELPERS ===
+// Phone validation regex - must start with + and country code, 7-16 digits total
+const PHONE_REGEX = /^\+[1-9]\d{6,15}$/;
+// Email validation regex
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Validates phone number format (international with country code)
+ */
+function validatePhone(phone: string): string | null {
+  if (!phone) return "Phone number is required";
+  const cleanPhone = phone.replace(/\s/g, ""); // Strip spaces
+  if (!PHONE_REGEX.test(cleanPhone)) {
+    return "Please enter a valid phone number with country code (e.g., +447700123456)";
+  }
+  return null;
+}
+
+/**
+ * Validates email format (if provided)
+ */
+function validateEmail(email: string): string | null {
+  if (!email) return null; // Email is optional
+  if (!EMAIL_REGEX.test(email)) {
+    return "Please enter a valid email address";
+  }
+  return null;
+}
+
+/**
+ * Sanitize user input to prevent XSS
+ * Removes < > \ characters, trims, and limits length
+ */
+function sanitizeText(text: string, maxLength: number = 500): string {
+  return text
+    .replace(/[<>\\]/g, "") // Remove potentially dangerous characters
+    .trim()
+    .slice(0, maxLength);
+}
+
+/**
+ * Fetch wrapper with AbortController timeout (PHASE 2: Network Reliability)
+ * Prevents requests from hanging indefinitely on slow networks
+ */
+const FETCH_TIMEOUT_MS = 30000; // 30 seconds
+
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+  timeoutMs: number = FETCH_TIMEOUT_MS
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    return response;
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("Request timed out. Please check your connection and try again.");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 export default function BookingForm({
   session,
   onBookingComplete,
@@ -152,7 +222,7 @@ export default function BookingForm({
     }
   }
 
-  // Fetch route when coordinates change
+  // Fetch route when coordinates change (with timeout handling)
   const fetchRoute = useCallback(async () => {
     if (!pickup.lat || !pickup.lng || !dropoff.lat || !dropoff.lng) {
       onRouteChange?.(null);
@@ -162,7 +232,7 @@ export default function BookingForm({
     try {
       const validStops = stops.filter((s) => s.lat && s.lng);
 
-      const res = await fetch("/api/route-path", {
+      const res = await fetchWithTimeout("/api/route-path", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -170,7 +240,7 @@ export default function BookingForm({
           stops: validStops.map((s) => ({ lat: s.lat, lng: s.lng })),
           dropoff: { lat: dropoff.lat, lng: dropoff.lng },
         }),
-      });
+      }, 15000); // 15s timeout for route calculation
 
       if (res.ok) {
         const response = await res.json();
@@ -225,42 +295,90 @@ export default function BookingForm({
 
   // Create booking
   async function createBooking() {
-    // Validate
+    // === PHASE 1: Enhanced Validation ===
+    
+    // Validate multi-passenger mode
     if (isMultiPassenger) {
       const validPassengers = multiPassengers.filter((p) => p.firstName && p.lastName && p.phone);
       if (validPassengers.length === 0) {
         setBookingResult({ error: "At least one passenger with name and phone is required" });
+        document.getElementById("booking-result")?.scrollIntoView({ behavior: "smooth", block: "center" });
         return;
+      }
+      // Validate each passenger's phone and email
+      for (const p of validPassengers) {
+        const phoneError = validatePhone(p.phone);
+        if (phoneError) {
+          setBookingResult({ error: `${p.firstName}: ${phoneError}` });
+          document.getElementById("booking-result")?.scrollIntoView({ behavior: "smooth", block: "center" });
+          return;
+        }
+        const emailError = validateEmail(p.email || "");
+        if (emailError) {
+          setBookingResult({ error: `${p.firstName}: ${emailError}` });
+          document.getElementById("booking-result")?.scrollIntoView({ behavior: "smooth", block: "center" });
+          return;
+        }
       }
     } else {
+      // Single passenger validation
       if (!firstName || !lastName) {
         setBookingResult({ error: "Passenger first and last name are required" });
+        document.getElementById("booking-result")?.scrollIntoView({ behavior: "smooth", block: "center" });
         return;
       }
-      if (!phone) {
-        setBookingResult({ error: "Passenger phone number is required" });
+      
+      // Phone validation (Critical Fix #1)
+      const phoneError = validatePhone(phone);
+      if (phoneError) {
+        setBookingResult({ error: phoneError });
+        document.getElementById("booking-result")?.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
+      
+      // Email validation (Critical Fix #2)
+      const emailError = validateEmail(email);
+      if (emailError) {
+        setBookingResult({ error: emailError });
+        document.getElementById("booking-result")?.scrollIntoView({ behavior: "smooth", block: "center" });
         return;
       }
     }
 
+    // Address validation
     if (!pickup.address || !dropoff.address) {
       setBookingResult({ error: "Pickup and dropoff addresses are required" });
+      document.getElementById("booking-result")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
     if (!pickup.lat || !pickup.lng) {
       setBookingResult({ error: "Please select a valid pickup address from the suggestions" });
+      document.getElementById("booking-result")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
     if (!dropoff.lat || !dropoff.lng) {
       setBookingResult({ error: "Please select a valid dropoff address from the suggestions" });
+      document.getElementById("booking-result")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
+    }
+    
+    // Scheduled time validation (Critical Fix #3)
+    if (!asap && pickupDateTime) {
+      const scheduledTime = new Date(pickupDateTime);
+      const minTime = new Date();
+      minTime.setMinutes(minTime.getMinutes() + 20); // Minimum 20 minutes from now
+      if (scheduledTime < minTime) {
+        setBookingResult({ error: "Pickup time must be at least 20 minutes from now" });
+        document.getElementById("booking-result")?.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
     }
 
     setIsBooking(true);
     setBookingResult(null);
 
     try {
-      // Build notes
+      // Build notes (with XSS sanitization - Critical Fix #4)
       const noteParts = [];
       if (vehicleType === "luxury") {
         noteParts.push("Executive V-Class requested");
@@ -268,10 +386,12 @@ export default function BookingForm({
         noteParts.push("Multi-seater vehicle requested");
       }
       if (flightNumber) {
-        noteParts.push(`Flight: ${flightNumber}`);
+        // Sanitize flight number input
+        noteParts.push(`Flight: ${sanitizeText(flightNumber, 20)}`);
       }
       if (notes) {
-        noteParts.push(notes);
+        // Sanitize user notes to prevent XSS
+        noteParts.push(sanitizeText(notes, 500));
       }
       const combinedNotes = noteParts.join(" • ");
       const pickupTime = asap ? new Date().toISOString() : pickupDateTime ? new Date(pickupDateTime).toISOString() : new Date().toISOString();
@@ -288,7 +408,7 @@ export default function BookingForm({
           const passengerPhones = sharedPickupPassengers.map((p) => p.phone).join(", ");
           const multiNotes = `GROUP BOOKING (${sharedPickupPassengers.length} passengers): ${passengerNames}\nPhones: ${passengerPhones}${combinedNotes ? `\n${combinedNotes}` : ""}`;
 
-          const res = await fetch(PENDING_BOOK_API, {
+          const res = await fetchWithTimeout(PENDING_BOOK_API, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -327,7 +447,7 @@ export default function BookingForm({
         for (const passenger of customPickupPassengers) {
           const customNotes = `Different pickup location${combinedNotes ? `\n${combinedNotes}` : ""}`;
 
-          const res = await fetch(PENDING_BOOK_API, {
+          const res = await fetchWithTimeout(PENDING_BOOK_API, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -381,8 +501,8 @@ export default function BookingForm({
           setBookingResult({ error: bookingResults[0]?.error || "All bookings failed" });
         }
       } else {
-        // Single passenger booking
-        const res = await fetch(PENDING_BOOK_API, {
+        // Single passenger booking (with timeout handling)
+        const res = await fetchWithTimeout(PENDING_BOOK_API, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -437,6 +557,8 @@ export default function BookingForm({
 
   return (
     <div className="bg-surface border border-white/10 rounded-xl p-5 space-y-6">
+      {/* Fieldset wrapper to disable all inputs during submission (PHASE 2: Prevent Double Submission) */}
+      <fieldset disabled={isBooking} className="space-y-6">
       {/* Section: Booking Info */}
       <section className="space-y-4">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted flex items-center gap-2">
@@ -643,10 +765,11 @@ export default function BookingForm({
           </div>
         </div>
       </section>
+      </fieldset>
 
-      {/* Result Message */}
+      {/* Result Message - with id for scroll targeting */}
       {bookingResult && (
-        <div className={`p-3 rounded-lg text-sm ${bookingResult.success ? (bookingResult.status === "pending" ? "bg-amber-500/10 border border-amber-500/30 text-amber-400" : "bg-emerald-500/10 border border-emerald-500/30 text-emerald-400") : "bg-red-500/10 border border-red-500/30 text-red-400"}`}>
+        <div id="booking-result" className={`p-3 rounded-lg text-sm ${bookingResult.success ? (bookingResult.status === "pending" ? "bg-amber-500/10 border border-amber-500/30 text-amber-400" : "bg-emerald-500/10 border border-emerald-500/30 text-emerald-400") : "bg-red-500/10 border border-red-500/30 text-red-400"}`}>
           {bookingResult.success ? (
             <div>
               <div className="flex items-center gap-2 mb-2">
@@ -681,9 +804,9 @@ export default function BookingForm({
         </div>
       )}
 
-      {/* Submit Button */}
+      {/* Submit Button - min-h-[44px] for touch target accessibility */}
       <div className="pt-2">
-        <button onClick={createBooking} disabled={isBooking} className="w-full py-3 bg-[#ffd55c] text-black font-semibold text-sm rounded-lg hover:bg-[#ffcc33] transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-[#ffd55c]/10">
+        <button onClick={createBooking} disabled={isBooking} className="w-full py-3 min-h-[44px] bg-[#ffd55c] text-black font-semibold text-sm rounded-lg hover:bg-[#ffcc33] transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-[#ffd55c]/10">
           {isBooking ? (
             <>
               <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
@@ -692,11 +815,17 @@ export default function BookingForm({
           ) : (
             <>
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 8v8M8 12h8" /></svg>
-              Submit Booking
+              Request Booking
             </>
           )}
         </button>
         <p className="text-[11px] text-center text-[#8a8a8a] mt-2">All bookings require approval before dispatch</p>
+        
+        {/* Terms & Conditions + Fare Disclaimer (PHASE 3) */}
+        <div className="mt-3 pt-3 border-t border-white/5 text-[10px] text-[#666] text-center space-y-1">
+          <p>By submitting, you agree to our <a href="/terms" className="text-[#ffd55c] hover:underline">Terms & Conditions</a>.</p>
+          <p>Fare estimates are approximate and may vary based on traffic, waiting time, and route changes.</p>
+        </div>
       </div>
     </div>
   );

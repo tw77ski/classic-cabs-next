@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import JourneyForm from "./components/JourneyForm";
 import MapPreview from "./components/MapPreview";
 import DateTimeInput from "./components/DateTimeInput";
@@ -668,12 +668,19 @@ export default function Page() {
     }
   }
 
-  // Prepare coordinates for map
-  const pickupCoords = pickup.lat && pickup.lng ? { lat: pickup.lat, lng: pickup.lng } : null;
-  const dropoffCoords = dropoff.lat && dropoff.lng ? { lat: dropoff.lat, lng: dropoff.lng } : null;
-  const stopCoords = stops
-    .filter(s => s.lat && s.lng)
-    .map(s => ({ lat: s.lat!, lng: s.lng! }));
+  // Prepare coordinates for map (PHASE 4: Memoized to prevent unnecessary recalculations)
+  const pickupCoords = useMemo(() => 
+    pickup.lat && pickup.lng ? { lat: pickup.lat, lng: pickup.lng } : null,
+    [pickup.lat, pickup.lng]
+  );
+  const dropoffCoords = useMemo(() => 
+    dropoff.lat && dropoff.lng ? { lat: dropoff.lat, lng: dropoff.lng } : null,
+    [dropoff.lat, dropoff.lng]
+  );
+  const stopCoords = useMemo(() => 
+    stops.filter(s => s.lat && s.lng).map(s => ({ lat: s.lat!, lng: s.lng! })),
+    [stops]
+  );
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
@@ -1067,7 +1074,7 @@ export default function Page() {
           <button
             onClick={handleEstimate}
             disabled={isLoading}
-            className="w-full py-3 rounded-lg bg-[#ffd55c] text-black font-semibold hover:bg-[#ffcc33] transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full py-3 min-h-[44px] rounded-lg bg-[#ffd55c] text-black font-semibold hover:bg-[#ffcc33] transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {isLoading ? (
               <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
@@ -1084,10 +1091,16 @@ export default function Page() {
           <button
             onClick={handleBooking}
             disabled={isLoading}
-            className="w-full py-3 rounded-lg border-2 border-[#ffd55c] text-[#ffd55c] font-semibold hover:bg-[#ffd55c]/10 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-3 min-h-[44px] rounded-lg border-2 border-[#ffd55c] text-[#ffd55c] font-semibold hover:bg-[#ffd55c]/10 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Book Your Ride
+            Confirm Booking
           </button>
+          
+          {/* Terms & Conditions + Fare Disclaimer (PHASE 3) */}
+          <div className="pt-2 text-[10px] text-[#666] text-center space-y-1">
+            <p>By booking, you agree to our <a href="/terms" className="text-[#ffd55c] hover:underline">Terms & Conditions</a>.</p>
+            <p>Fare estimates are approximate and may vary based on traffic, waiting time, and route changes.</p>
+          </div>
         </section>
 
         {/* ===== Fare Estimate Loading Skeleton ===== */}

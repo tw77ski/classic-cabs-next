@@ -4,6 +4,40 @@
 // =============================================================================
 
 // =============================================================================
+// Network Timeout Helper (PHASE 2: Reliability)
+// =============================================================================
+
+const DEFAULT_TIMEOUT_MS = 30000; // 30 seconds
+
+/**
+ * Fetch wrapper with AbortController timeout
+ * Prevents requests from hanging indefinitely on slow networks
+ */
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+  timeoutMs: number = DEFAULT_TIMEOUT_MS
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    return response;
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("Request timed out. Please check your connection and try again.");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+// =============================================================================
 // Types
 // =============================================================================
 
@@ -97,11 +131,12 @@ export async function searchAddress(query: string) {
   if (!query || query.length < 2) return [];
 
   try {
-    const res = await fetch("/api/geocode", {
+    // Use fetchWithTimeout for network reliability (10s for search)
+    const res = await fetchWithTimeout("/api/geocode", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ address: query }),
-    });
+    }, 10000);
 
     if (!res.ok) return [];
 
@@ -134,7 +169,8 @@ export async function getEstimate(request: EstimateRequest): Promise<EstimateRes
   };
 
   try {
-    const res = await fetch("/api/estimate", {
+    // Use fetchWithTimeout for network reliability
+    const res = await fetchWithTimeout("/api/estimate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -190,7 +226,8 @@ export async function createBooking(request: BookingRequest): Promise<BookingRes
   };
 
   try {
-    const res = await fetch("/api/book", {
+    // Use fetchWithTimeout for network reliability (30s timeout)
+    const res = await fetchWithTimeout("/api/book", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -225,7 +262,8 @@ export async function createBooking(request: BookingRequest): Promise<BookingRes
 
 export async function getBookingStatus(bookingId: string): Promise<StatusResponse> {
   try {
-    const res = await fetch(`/api/status?bookingId=${encodeURIComponent(bookingId)}`, {
+    // Use fetchWithTimeout for network reliability
+    const res = await fetchWithTimeout(`/api/status?bookingId=${encodeURIComponent(bookingId)}`, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
     });
@@ -246,7 +284,8 @@ export async function getBookingStatus(bookingId: string): Promise<StatusRespons
 
 export async function cancelBooking(bookingId: string): Promise<CancelResponse> {
   try {
-    const res = await fetch("/api/cancel", {
+    // Use fetchWithTimeout for network reliability
+    const res = await fetchWithTimeout("/api/cancel", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ bookingId }),

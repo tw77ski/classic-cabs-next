@@ -1,0 +1,168 @@
+// Prisma Schema for Corporate Booking System
+// Supports Auth.js + TaxiCaller integration
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// Auth.js Required Models
+// =============================================================================
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// =============================================================================
+// User Model - Maps to TaxiCaller Corporate Accounts
+// =============================================================================
+
+model User {
+  id                  String    @id @default(cuid())
+  email               String    @unique
+  emailVerified       DateTime?
+  password            String?   // bcrypt hashed
+  name                String
+  image               String?
+  
+  // Internal role (admin can manage users, user is regular)
+  role                UserRole  @default(USER)
+  
+  // TaxiCaller Integration
+  taxiCallerCompanyId Int       // Company/Account ID from TaxiCaller
+  taxiCallerRoles     String[]  @default([]) // Roles within TaxiCaller company
+  
+  // Invite system
+  inviteToken         String?   @unique
+  inviteTokenExpires  DateTime?
+  passwordSetAt       DateTime?
+  
+  // Timestamps
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  lastLoginAt         DateTime?
+  
+  // Relations
+  accounts            Account[]
+  sessions            Session[]
+  createdInvites      Invite[]  @relation("InviteCreator")
+  
+  @@index([email])
+  @@index([taxiCallerCompanyId])
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+// =============================================================================
+// Invite Model - For admin-created user invitations
+// =============================================================================
+
+model Invite {
+  id                  String    @id @default(cuid())
+  email               String
+  name                String
+  token               String    @unique
+  
+  // TaxiCaller assignment
+  taxiCallerCompanyId Int
+  taxiCallerRoles     String[]  @default([])
+  role                UserRole  @default(USER)
+  
+  // Status
+  expiresAt           DateTime
+  usedAt              DateTime?
+  
+  // Who created the invite
+  createdById         String
+  createdBy           User      @relation("InviteCreator", fields: [createdById], references: [id])
+  createdAt           DateTime  @default(now())
+
+  @@index([email])
+  @@index([token])
+  @@map("invites")
+}
+
+// =============================================================================
+// TaxiCaller Company Cache (optional - for caching company info)
+// =============================================================================
+
+model TaxiCallerCompany {
+  id                  Int       @id // TaxiCaller account ID
+  name                String
+  address             String?
+  billingEmail        String?
+  
+  // Cached settings
+  costCentres         Json?     @default("[]")
+  departments         Json?     @default("[]")
+  
+  // Cache management
+  lastSyncedAt        DateTime  @default(now())
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@map("taxicaller_companies")
+}
+
+// =============================================================================
+// Audit Log (optional - for tracking important actions)
+// =============================================================================
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  action      String   // e.g., "user.created", "booking.made", "password.changed"
+  details     Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

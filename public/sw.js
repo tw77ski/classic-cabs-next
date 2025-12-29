@@ -1,10 +1,10 @@
 // Service Worker for Classic Cabs PWA
 // Enhanced caching strategies for offline support
 
-const CACHE_NAME = 'classic-cabs-v1';
-const STATIC_CACHE = 'classic-cabs-static-v1';
-const DYNAMIC_CACHE = 'classic-cabs-dynamic-v1';
-const API_CACHE = 'classic-cabs-api-v1';
+const CACHE_NAME = 'classic-cabs-v2';
+const STATIC_CACHE = 'classic-cabs-static-v2';
+const DYNAMIC_CACHE = 'classic-cabs-dynamic-v2';
+const API_CACHE = 'classic-cabs-api-v2';
 
 // Assets to cache immediately on install
 const STATIC_ASSETS = [
@@ -81,9 +81,14 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static assets and pages - Cache first, fall back to network
-  if (request.destination === 'document' ||
-      request.destination === 'script' ||
+  // HTML pages - Network first (so updates show immediately)
+  if (request.destination === 'document') {
+    event.respondWith(networkFirst(request, STATIC_CACHE));
+    return;
+  }
+
+  // Static assets (JS, CSS, fonts, images) - Cache first
+  if (request.destination === 'script' ||
       request.destination === 'style' ||
       request.destination === 'font' ||
       request.destination === 'image') {

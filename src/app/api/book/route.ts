@@ -1,4 +1,30 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
+
+// ---- CSRF Protection Helper ----
+/**
+ * Basic CSRF protection via Origin header validation
+ * Ensures requests come from the same origin (prevents cross-site form submissions)
+ */
+function validateOrigin(request: NextRequest): boolean {
+  const origin = request.headers.get("origin");
+  const host = request.headers.get("host");
+  
+  // Allow requests without origin header (same-origin requests in some browsers)
+  if (!origin) return true;
+  
+  // Extract hostname from origin
+  try {
+    const originUrl = new URL(origin);
+    // Check if origin matches the host (or localhost for development)
+    const isValid = originUrl.host === host || 
+                    originUrl.hostname === "localhost" ||
+                    originUrl.hostname === "127.0.0.1" ||
+                    (host ? host.includes("vercel.app") : false); // Allow Vercel preview deployments
+    return isValid;
+  } catch {
+    return false;
+  }
+}
 
 // ---- TaxiCaller env ----
 const TC_DOMAIN = process.env.TAXICALLER_API_DOMAIN || "api-rc.taxicaller.net";
@@ -56,6 +82,18 @@ async function getJwt(): Promise<string> {
 
 // ---- Helpers ----
 const jerseyFallback = { lat: 49.21, lng: -2.13 };
+
+/**
+ * Sanitize user input to prevent XSS (Critical Security Fix)
+ * Removes < > \ characters, trims, and limits length
+ */
+function sanitizeText(text: string, maxLength: number = 500): string {
+  if (!text) return "";
+  return text
+    .replace(/[<>\\]/g, "") // Remove potentially dangerous characters
+    .trim()
+    .slice(0, maxLength);
+}
 
 const toTC = (lng: number, lat: number) => [
   Math.round(lng * 1e6),
@@ -182,8 +220,17 @@ function buildRouteNodes({
   return nodes;
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
+    // CSRF Protection: Validate request origin
+    if (!validateOrigin(req)) {
+      console.warn("🚫 [CSRF] Request rejected - invalid origin");
+      return NextResponse.json(
+        { ok: false, error: "Invalid request origin" },
+        { status: 403 }
+      );
+    }
+    
     const body = await req.json() as BookingRequestBody;
 
     // Validate pickup coordinates
@@ -245,13 +292,14 @@ export async function POST(req: Request) {
       ? Math.floor(Date.parse(body.when.time) / 1000) 
       : 0;
 
-    // Build notes with vehicle type info
+    // Build notes with vehicle type info (with XSS sanitization)
     const noteParts = [];
     if (body.vehicle_type === "luxury" || body.vehicleType === "luxury") {
       noteParts.push("Executive V-Class requested");
     }
     if (body.notes) {
-      noteParts.push(body.notes);
+      // Sanitize user-provided notes to prevent XSS attacks
+      noteParts.push(sanitizeText(body.notes, 500));
     }
     const mergedNotes = noteParts.join(" • ");
 
@@ -269,20 +317,23 @@ export async function POST(req: Request) {
         lng: s.lng,
       }));
 
-    // Build route nodes
+    // Build route nodes (with sanitized addresses)
     const nodes = buildRouteNodes({
-      pickupAddress: body.pickup.address || "",
+      pickupAddress: sanitizeText(body.pickup.address || "", 200),
       pickupLat: body.pickup.lat,
       pickupLng: body.pickup.lng,
-      dropoffAddress: body.dropoff.address || "",
+      dropoffAddress: sanitizeText(body.dropoff.address || "", 200),
       dropoffLat: body.dropoff.lat,
       dropoffLng: body.dropoff.lng,
-      stops,
+      stops: stops.map(s => ({
+        ...s,
+        address: sanitizeText(s.address || "", 200),
+      })),
       pickupTimeUnix: pickupUnix,
       notes: mergedNotes,
     });
 
-    // Build order payload
+    // Build order payload (with sanitized user inputs)
     const orderPayload = {
       order: {
         company_id: TC_COMPANY_ID,
@@ -292,9 +343,9 @@ export async function POST(req: Request) {
             "@type": "passengers",
             seq: 0,
             passenger: {
-              name: body.rider.name,
-              phone: body.rider.phone,
-              email: body.rider.email || "",
+              name: sanitizeText(body.rider.name, 100),
+              phone: sanitizeText(body.rider.phone, 20),
+              email: sanitizeText(body.rider.email || "", 100),
             },
             client_id: 0,
             require: {
